@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Ciderfy/Ciderfy.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Ciderfy.Tests/Ciderfy.Tests.csproj" />
+  </Folder>
+</Solution>
