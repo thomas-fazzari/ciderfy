@@ -336,8 +336,12 @@ internal sealed class App : IAsyncDisposable
 
         // Combine results
         var allResults = new List<MatchResult>();
-        var isrcMap = isrcMatched.ToDictionary(m => m.SpotifyTrack.SpotifyId);
-        var textMap = textResults.ToDictionary(m => m.SpotifyTrack.SpotifyId);
+        var isrcMap = isrcMatched
+            .DistinctBy(m => m.SpotifyTrack.SpotifyId)
+            .ToDictionary(m => m.SpotifyTrack.SpotifyId);
+        var textMap = textResults
+            .DistinctBy(m => m.SpotifyTrack.SpotifyId)
+            .ToDictionary(m => m.SpotifyTrack.SpotifyId);
 
         foreach (var track in playlist.Tracks)
         {
