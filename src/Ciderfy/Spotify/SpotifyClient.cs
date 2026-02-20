@@ -14,7 +14,7 @@ namespace Ciderfy.Spotify;
 /// <remarks>
 /// Uses the following auth sequence: fetch session info -> obtain access token via TOTP -> get client token
 /// </remarks>
-internal sealed partial class SpotifyClient : IDisposable
+internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContainer cookies)
 {
     private const string UserAgent =
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -36,21 +36,14 @@ internal sealed partial class SpotifyClient : IDisposable
     ];
     // csharpier-ignore-end
 
-    private readonly HttpClient _httpClient;
-    private readonly CookieContainer _cookies = new();
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly CookieContainer _cookies = cookies;
 
     private string? _accessToken;
     private string? _clientToken;
     private string? _clientId;
     private string? _clientVersion;
     private string? _deviceId;
-
-    public SpotifyClient()
-    {
-        var handler = new HttpClientHandler { CookieContainer = _cookies, UseCookies = true };
-        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", UserAgent);
-    }
 
     /// <summary>
     /// Fetches a playlist's metadata and tracks from Spotify using the unauthenticated GraphQL API
@@ -217,8 +210,8 @@ internal sealed partial class SpotifyClient : IDisposable
 
     private void ExtractDeviceIdFromCookies()
     {
-        var cookies = _cookies.GetCookies(new Uri(SpotifyBaseUrl));
-        if (cookies["sp_t"] is { } spTCookie)
+        var cookieCollection = _cookies.GetCookies(new Uri(SpotifyBaseUrl));
+        if (cookieCollection["sp_t"] is { } spTCookie)
             _deviceId = spTCookie.Value;
     }
 
@@ -335,6 +328,4 @@ internal sealed partial class SpotifyClient : IDisposable
 
     [GeneratedRegex(@"<script id=""appServerConfig"" type=""text/plain"">([^<]+)</script>")]
     private static partial Regex AppServerConfigRegex();
-
-    public void Dispose() => _httpClient.Dispose();
 }

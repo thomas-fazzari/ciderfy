@@ -49,10 +49,7 @@ internal record SpotifyUrlInfo(SpotifyUrlType Type, string Id)
 
     private static SpotifyUrlInfo? ParseSpotifyUrl(string url)
     {
-        if (
-            !Uri.TryCreate(url, UriKind.Absolute, out var uri)
-            || uri.Host.IndexOf(SpotifyDomain, StringComparison.OrdinalIgnoreCase) < 0
-        )
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !IsSpotifyHost(uri.Host))
             return null;
 
         var segments = uri.AbsolutePath.AsSpan().Trim('/');
@@ -87,4 +84,8 @@ internal record SpotifyUrlInfo(SpotifyUrlType Type, string Id)
 
     private static bool TryParseType(ReadOnlySpan<char> typeStr, out SpotifyUrlType type) =>
         Enum.TryParse(typeStr, ignoreCase: true, out type);
+
+    private static bool IsSpotifyHost(string host) =>
+        host.Equals(SpotifyDomain, StringComparison.OrdinalIgnoreCase)
+        || host.EndsWith($".{SpotifyDomain}", StringComparison.OrdinalIgnoreCase);
 }

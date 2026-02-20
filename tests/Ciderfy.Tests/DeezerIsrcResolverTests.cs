@@ -1,4 +1,6 @@
+using Ciderfy.Configuration;
 using Ciderfy.Matching;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Ciderfy.Tests;
@@ -10,7 +12,11 @@ public class DeezerIsrcResolverTests
     public async Task FindIsrc_KnownTrack_ReturnsIsrc()
     {
         // Arrange
-        using var resolver = new DeezerIsrcResolver();
+        using var deezerClient = TestHttpClients.CreateDeezerClient();
+        using var resolver = new DeezerIsrcResolver(
+            deezerClient,
+            Options.Create(new DeezerClientOptions())
+        );
         var ct = TestContext.Current.CancellationToken;
 
         var tracks = new List<TrackMetadata>
@@ -37,7 +43,11 @@ public class DeezerIsrcResolverTests
     public async Task FindIsrc_MultipleTracks_ResolvesAll()
     {
         // Arrange
-        using var resolver = new DeezerIsrcResolver();
+        using var deezerClient = TestHttpClients.CreateDeezerClient();
+        using var resolver = new DeezerIsrcResolver(
+            deezerClient,
+            Options.Create(new DeezerClientOptions())
+        );
         var ct = TestContext.Current.CancellationToken;
 
         var tracks = new List<TrackMetadata>
@@ -70,7 +80,11 @@ public class DeezerIsrcResolverTests
     public async Task FindIsrc_UnknownTrack_ReturnsNullIsrc()
     {
         // Arrange
-        using var resolver = new DeezerIsrcResolver();
+        using var deezerClient = TestHttpClients.CreateDeezerClient();
+        using var resolver = new DeezerIsrcResolver(
+            deezerClient,
+            Options.Create(new DeezerClientOptions())
+        );
         var ct = TestContext.Current.CancellationToken;
 
         var tracks = new List<TrackMetadata>

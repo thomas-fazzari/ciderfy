@@ -6,98 +6,103 @@ using static Ciderfy.TuiHelper;
 
 namespace Ciderfy;
 
-internal sealed class App : IAsyncDisposable
+internal sealed class App : IDisposable
 {
     private readonly TokenCache _tokenCache;
-    private readonly SpotifyClient _spotifyClient;
     private readonly AppleMusicAuth _auth;
-    private readonly AppleMusicClient _appleMusicClient;
     private readonly PlaylistTransferService _transferService;
-    private readonly DeezerIsrcResolver _deezerIsrcResolver;
     private readonly CancellationTokenSource _cts = new();
+    private readonly ConsoleCancelEventHandler _cancelKeyPressHandler;
 
     private string _storefront = "us";
     private string? _nextPlaylistName;
 
-    public App()
+    public App(TokenCache tokenCache, AppleMusicAuth auth, PlaylistTransferService transferService)
     {
-        _tokenCache = TokenCache.Load();
-        _spotifyClient = new SpotifyClient();
-        _auth = new AppleMusicAuth(_tokenCache);
-        _appleMusicClient = new AppleMusicClient();
-        _deezerIsrcResolver = new DeezerIsrcResolver();
-        var matcher = new TrackMatcher(_appleMusicClient);
-        _transferService = new PlaylistTransferService(
-            _spotifyClient,
-            _appleMusicClient,
-            matcher,
-            _deezerIsrcResolver
-        );
-    }
-
-    public async Task<int> RunAsync()
-    {
-        Console.CancelKeyPress += (_, e) =>
+        _tokenCache = tokenCache;
+        _auth = auth;
+        _transferService = transferService;
+        _cancelKeyPressHandler = (_, e) =>
         {
             e.Cancel = true;
             _cts.Cancel();
         };
+    }
 
-        PrintBanner();
-
-        AnsiConsole.MarkupLine(
-            $"[dim]Paste a Spotify playlist URL to transfer, or type [{Accent}]/help[/][/]"
-        );
-        PrintAuthStatus(
-            _tokenCache.HasValidDeveloperToken,
-            _tokenCache.HasValidUserToken,
-            _storefront
-        );
-        AnsiConsole.WriteLine();
-
-        while (!_cts.IsCancellationRequested)
+    public async Task<int> RunAsync()
+    {
+        Console.CancelKeyPress += _cancelKeyPressHandler;
+        try
         {
-            string input;
-            try
-            {
-                input = await AnsiConsole.PromptAsync(
-                    new TextPrompt<string>($"[{Accent}]>[/]").AllowEmpty(),
-                    _cts.Token
-                );
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+            PrintBanner();
 
-            if (string.IsNullOrWhiteSpace(input))
-                continue;
-
-            try
-            {
-                if (!await HandleInputAsync(input.Trim(), _cts.Token))
-                    return 0;
-            }
-            catch (OperationCanceledException)
-            {
-                AnsiConsole.MarkupLine("[yellow]Cancelled.[/]");
-            }
-            catch (AppleMusicUnauthorizedException)
-            {
-                _tokenCache.Clear();
-                AnsiConsole.MarkupLine(
-                    $"[red]Developer token expired.[/] Run [bold {Accent}]/auth[/] to re-authenticate."
-                );
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
-            }
-
+            AnsiConsole.MarkupLine(
+                $"[dim]Paste a Spotify playlist URL to transfer, or type [{Accent}]/help[/][/]"
+            );
+            PrintAuthStatus(
+                _tokenCache.HasValidDeveloperToken,
+                _tokenCache.HasValidUserToken,
+                _storefront
+            );
             AnsiConsole.WriteLine();
-        }
 
-        return 0;
+            while (!_cts.IsCancellationRequested)
+            {
+                string input;
+                try
+                {
+                    input = await AnsiConsole.PromptAsync(
+                        new TextPrompt<string>($"[{Accent}]>[/]").AllowEmpty(),
+                        _cts.Token
+                    );
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+
+                if (string.IsNullOrWhiteSpace(input))
+                    continue;
+
+                try
+                {
+                    if (!await HandleInputAsync(input.Trim(), _cts.Token))
+                        return 0;
+                }
+                catch (OperationCanceledException)
+                {
+                    AnsiConsole.MarkupLine("[yellow]Cancelled.[/]");
+                }
+                catch (AppleMusicRateLimitException ex)
+                {
+                    var details = ex.RetryAfterSeconds is { } retryAfter
+                        ? $" Retry after about [bold]{retryAfter}[/]s."
+                        : string.Empty;
+                    AnsiConsole.MarkupLine(
+                        $"[red]Apple Music rate limited (429). Transfer stopped.[/]{details}"
+                    );
+                }
+                catch (AppleMusicUnauthorizedException)
+                {
+                    _tokenCache.ClearDeveloperToken();
+                    AnsiConsole.MarkupLine(
+                        $"[red]Developer token expired.[/] Run [bold {Accent}]/auth[/] to refresh it."
+                    );
+                }
+                catch (Exception ex)
+                {
+                    AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(ex.Message)}");
+                }
+
+                AnsiConsole.WriteLine();
+            }
+
+            return 0;
+        }
+        finally
+        {
+            Console.CancelKeyPress -= _cancelKeyPressHandler;
+        }
     }
 
     private async Task<bool> HandleInputAsync(string input, CancellationToken ct)
@@ -257,8 +262,6 @@ internal sealed class App : IAsyncDisposable
         if (!await EnsureAuthenticatedAsync(ct))
             return;
 
-        _appleMusicClient.SetTokens(_tokenCache.DeveloperToken!, _tokenCache.UserToken!);
-
         var playlist = await WithStatusAsync(
             "Fetching playlist from Spotify...",
             () => _transferService.FetchSpotifyPlaylistAsync(playlistId, ct)
@@ -400,13 +403,8 @@ internal sealed class App : IAsyncDisposable
         return true;
     }
 
-    public ValueTask DisposeAsync()
+    public void Dispose()
     {
         _cts.Dispose();
-        _deezerIsrcResolver.Dispose();
-        _appleMusicClient.Dispose();
-        _auth.Dispose();
-        _spotifyClient.Dispose();
-        return ValueTask.CompletedTask;
     }
 }

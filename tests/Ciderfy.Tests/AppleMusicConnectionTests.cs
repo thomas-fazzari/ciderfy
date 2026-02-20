@@ -1,4 +1,6 @@
 using Ciderfy.Apple;
+using Ciderfy.Configuration;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Ciderfy.Tests;
@@ -19,7 +21,8 @@ public class AppleMusicConnectionTests
     public async Task ExtractDeveloperToken_ReturnsValidJwt()
     {
         // Arrange
-        using var auth = new AppleMusicAuth(_tokenCache);
+        using var authClient = TestHttpClients.CreateAppleMusicAuthClient();
+        var auth = new AppleMusicAuth(_tokenCache, authClient);
         var ct = TestContext.Current.CancellationToken;
 
         // Act
@@ -35,7 +38,8 @@ public class AppleMusicConnectionTests
     public async Task ExtractDeveloperToken_IsCached()
     {
         // Arrange
-        using var auth = new AppleMusicAuth(_tokenCache);
+        using var authClient = TestHttpClients.CreateAppleMusicAuthClient();
+        var auth = new AppleMusicAuth(_tokenCache, authClient);
         var ct = TestContext.Current.CancellationToken;
 
         // Act
@@ -51,12 +55,17 @@ public class AppleMusicConnectionTests
     public async Task SearchCatalogByText_ReturnsResults()
     {
         // Arrange
-        using var auth = new AppleMusicAuth(_tokenCache);
-        using var client = new AppleMusicClient();
+        using var authClient = TestHttpClients.CreateAppleMusicAuthClient();
+        var auth = new AppleMusicAuth(_tokenCache, authClient);
+        using var appleMusicHttpClient = TestHttpClients.CreateAppleMusicClient();
+        using var client = new AppleMusicClient(
+            appleMusicHttpClient,
+            Options.Create(new AppleMusicClientOptions()),
+            _tokenCache
+        );
         var ct = TestContext.Current.CancellationToken;
 
-        var devToken = await auth.GetDeveloperTokenAsync(ct);
-        client.SetTokens(devToken);
+        await auth.GetDeveloperTokenAsync(ct);
 
         // Act
         var results = await client.SearchByTextAllAsync("Revolution 909 Daft Punk", ct: ct);

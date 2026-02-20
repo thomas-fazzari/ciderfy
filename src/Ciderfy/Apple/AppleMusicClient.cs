@@ -2,52 +2,38 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using Ciderfy.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Apple;
 
-public sealed class AppleMusicRateLimitException() : Exception("Apple Music rate limit exhausted");
+public sealed class AppleMusicRateLimitException(int? retryAfterSeconds = null)
+    : Exception(
+        retryAfterSeconds is null
+            ? "Apple Music rate limit exhausted"
+            : $"Apple Music rate limit exhausted (retry after {retryAfterSeconds.Value}s)"
+    )
+{
+    public int? RetryAfterSeconds { get; } = retryAfterSeconds;
+}
 
 public sealed class AppleMusicUnauthorizedException()
     : Exception("Apple Music returned 401 Unauthorized, developer token may have expired");
 
-internal sealed class AppleMusicClient : IDisposable
+internal sealed class AppleMusicClient(
+    HttpClient httpClient,
+    IOptions<AppleMusicClientOptions> options,
+    TokenCache tokenCache
+) : IDisposable
 {
     private const string ApiBaseUrl = "https://api.music.apple.com/v1";
-    private const int MinDelayBetweenCallsMs = 1000;
 
-    private readonly HttpClient _httpClient;
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly AppleMusicClientOptions _options = options.Value;
+    private readonly TokenCache _tokenCache = tokenCache;
     private readonly SemaphoreSlim _rateLimitLock = new(1, 1);
 
-    private string? _userToken;
     private DateTimeOffset _lastCallTime = DateTimeOffset.MinValue;
-
-    public AppleMusicClient()
-    {
-        var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All };
-
-        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(30) };
-        _httpClient.DefaultRequestHeaders.Add(
-            "User-Agent",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)"
-        );
-        _httpClient.DefaultRequestHeaders.Add("Origin", "https://music.apple.com");
-    }
-
-    public void SetTokens(string developerToken, string? userToken = null)
-    {
-        _userToken = userToken;
-
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            developerToken
-        );
-
-        if (userToken is not null)
-        {
-            _httpClient.DefaultRequestHeaders.Remove("Music-User-Token");
-            _httpClient.DefaultRequestHeaders.Add("Music-User-Token", userToken);
-        }
-    }
 
     public async Task<Dictionary<string, AppleMusicTrack>> BatchSearchByIsrcAsync(
         IReadOnlyList<string> isrcs,
@@ -55,6 +41,8 @@ internal sealed class AppleMusicClient : IDisposable
         CancellationToken ct = default
     )
     {
+        ConfigureAuthHeaders(requireUserToken: false);
+
         const int batchSize = 25;
         var result = new Dictionary<string, AppleMusicTrack>(StringComparer.OrdinalIgnoreCase);
 
@@ -92,6 +80,8 @@ internal sealed class AppleMusicClient : IDisposable
         CancellationToken ct = default
     )
     {
+        ConfigureAuthHeaders(requireUserToken: false);
+
         var encodedQuery = Uri.EscapeDataString(query);
         var url =
             $"{ApiBaseUrl}/catalog/{storefront}/search?types=songs&limit=10&term={encodedQuery}";
@@ -126,7 +116,7 @@ internal sealed class AppleMusicClient : IDisposable
         CancellationToken ct = default
     )
     {
-        EnsureUserToken();
+        ConfigureAuthHeaders(requireUserToken: true);
 
         var payload = new
         {
@@ -159,7 +149,7 @@ internal sealed class AppleMusicClient : IDisposable
         CancellationToken ct = default
     )
     {
-        EnsureUserToken();
+        ConfigureAuthHeaders(requireUserToken: true);
 
         const int batchSize = 100;
 
@@ -182,12 +172,30 @@ internal sealed class AppleMusicClient : IDisposable
         return true;
     }
 
-    private void EnsureUserToken()
+    private void ConfigureAuthHeaders(bool requireUserToken)
     {
-        if (string.IsNullOrEmpty(_userToken))
+        if (
+            string.IsNullOrWhiteSpace(_tokenCache.DeveloperToken)
+            || !_tokenCache.HasValidDeveloperToken
+        )
+            throw new AppleMusicUnauthorizedException();
+
+        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
+            "Bearer",
+            _tokenCache.DeveloperToken
+        );
+
+        _httpClient.DefaultRequestHeaders.Remove("Music-User-Token");
+
+        if (!requireUserToken)
+            return;
+
+        if (string.IsNullOrWhiteSpace(_tokenCache.UserToken) || !_tokenCache.HasValidUserToken)
             throw new InvalidOperationException(
                 "User token is required for this operation. Run '/auth' first."
             );
+
+        _httpClient.DefaultRequestHeaders.Add("Music-User-Token", _tokenCache.UserToken);
     }
 
     private Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct) =>
@@ -218,7 +226,7 @@ internal sealed class AppleMusicClient : IDisposable
         using var response = await sendAsync(ct);
 
         if (response.StatusCode is HttpStatusCode.TooManyRequests)
-            throw new AppleMusicRateLimitException();
+            throw new AppleMusicRateLimitException(GetRetryAfterSeconds(response));
 
         if (response.StatusCode is HttpStatusCode.Unauthorized)
             throw new AppleMusicUnauthorizedException();
@@ -229,14 +237,32 @@ internal sealed class AppleMusicClient : IDisposable
         return await response.Content.ReadAsStringAsync(ct);
     }
 
+    private static int? GetRetryAfterSeconds(HttpResponseMessage response)
+    {
+        var retryAfter = response.Headers.RetryAfter;
+        if (retryAfter is null)
+            return null;
+
+        if (retryAfter.Delta is { } delta)
+            return Math.Max(1, (int)Math.Ceiling(delta.TotalSeconds));
+
+        if (retryAfter.Date is { } date)
+        {
+            var seconds = (int)Math.Ceiling((date - DateTimeOffset.UtcNow).TotalSeconds);
+            return seconds > 0 ? seconds : null;
+        }
+
+        return null;
+    }
+
     private async Task EnforceRateLimitAsync(CancellationToken ct)
     {
         await _rateLimitLock.WaitAsync(ct);
         try
         {
             var elapsed = (DateTimeOffset.UtcNow - _lastCallTime).TotalMilliseconds;
-            if (elapsed < MinDelayBetweenCallsMs)
-                await Task.Delay(MinDelayBetweenCallsMs - (int)elapsed, ct);
+            if (elapsed < _options.MinDelayBetweenCallsMs)
+                await Task.Delay(_options.MinDelayBetweenCallsMs - (int)elapsed, ct);
 
             _lastCallTime = DateTimeOffset.UtcNow;
         }
@@ -268,7 +294,6 @@ internal sealed class AppleMusicClient : IDisposable
 
     public void Dispose()
     {
-        _httpClient.Dispose();
         _rateLimitLock.Dispose();
     }
 }

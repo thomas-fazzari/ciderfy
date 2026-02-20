@@ -96,20 +96,8 @@ internal sealed class PlaylistTransferService(
             var track = tracks[i];
             progress?.Report(new TrackMatchProgress(track, i));
 
-            try
-            {
-                var result = await matcher.MatchTrackByTextAsync(track, storefront, ct);
-                results.Add(result);
-            }
-            catch (AppleMusicRateLimitException)
-            {
-                await Console.Error.WriteLineAsync(
-                    $"[AppleMusic] Rate limited — skipping {tracks.Count - i} remaining track(s)"
-                );
-                for (var j = i; j < tracks.Count; j++)
-                    results.Add(new MatchResult.NotFound(tracks[j], "Rate limited by Apple Music"));
-                break;
-            }
+            var result = await matcher.MatchTrackByTextAsync(track, storefront, ct);
+            results.Add(result);
         }
 
         return results;

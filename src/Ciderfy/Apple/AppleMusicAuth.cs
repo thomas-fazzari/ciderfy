@@ -11,27 +11,26 @@ namespace Ciderfy.Apple;
 /// <remarks>
 /// Token is cached in <see cref="TokenCache"/> and reused until it expires
 /// </remarks>
-internal sealed partial class AppleMusicAuth(TokenCache tokenCache) : IDisposable
+internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient httpClient)
 {
     private const string AppleMusicUrl = "https://music.apple.com";
-    private const string UserAgent =
-        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
-
-    private readonly HttpClient _httpClient = CreateHttpClient();
+    private readonly TokenCache _tokenCache = tokenCache;
+    private readonly HttpClient _httpClient = httpClient;
 
     /// <returns>
     /// A valid developer token, using the cache if available or scraping it from the web player
     /// </returns>
     public async Task<string> GetDeveloperTokenAsync(CancellationToken ct = default)
     {
-        if (tokenCache.HasValidDeveloperToken)
-            return tokenCache.DeveloperToken!;
+        if (_tokenCache.HasValidDeveloperToken)
+            return _tokenCache.DeveloperToken!;
 
         var token = await ExtractDeveloperTokenFromWebAsync(ct);
 
-        tokenCache.DeveloperToken = token;
-        tokenCache.DeveloperTokenExpiry = GetJwtExpiry(token) ?? DateTimeOffset.UtcNow.AddHours(12);
-        tokenCache.Save();
+        _tokenCache.DeveloperToken = token;
+        _tokenCache.DeveloperTokenExpiry =
+            GetJwtExpiry(token) ?? DateTimeOffset.UtcNow.AddHours(12);
+        _tokenCache.Save();
 
         return token;
     }
@@ -55,6 +54,9 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache) : IDisposabl
             .Where(url => url.Contains("assets/") || url.Contains("js/"))
             .ToList();
 
+        string? bestCandidate = null;
+        var bestCandidateExpiry = DateTimeOffset.MinValue;
+
         foreach (var scriptUrl in scriptUrls)
         {
             ct.ThrowIfCancellationRequested();
@@ -64,32 +66,42 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache) : IDisposabl
             try
             {
                 var js = await _httpClient.GetStringAsync(fullUrl, ct);
-                var jwtMatch = JwtTokenRegex().Match(js);
 
-                if (!jwtMatch.Success)
-                    continue;
+                foreach (Match jwtMatch in JwtTokenRegex().Matches(js))
+                {
+                    var token = jwtMatch.Value;
 
-                var token = jwtMatch.Value;
-                if (IsAppleMusicJwt(token))
-                    return token;
+                    if (!IsAppleMusicJwt(token))
+                        continue;
+
+                    var expiry = GetJwtExpiry(token);
+                    if (expiry is null)
+                        continue;
+
+                    if (expiry.Value > bestCandidateExpiry)
+                    {
+                        bestCandidate = token;
+                        bestCandidateExpiry = expiry.Value;
+                    }
+                }
             }
-            catch
+            catch (HttpRequestException)
             {
                 // Skip failed bundles and try next
             }
+            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
+            {
+                // Skip timed out bundles and try next
+            }
         }
+
+        if (bestCandidate is not null)
+            return bestCandidate;
 
         throw new InvalidOperationException(
             "Could not extract Apple Music developer token from web player. "
                 + "Apple may have changed their web player structure."
         );
-    }
-
-    private static HttpClient CreateHttpClient()
-    {
-        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        client.DefaultRequestHeaders.Add("User-Agent", UserAgent);
-        return client;
     }
 
     private static bool IsAppleMusicJwt(string token)
@@ -103,10 +115,36 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache) : IDisposabl
             var headerJson = Encoding.UTF8.GetString(Base64Url.DecodeFromChars(parts[0]));
             using var header = JsonDocument.Parse(headerJson);
 
-            return header.RootElement.TryGetProperty("alg", out var alg)
-                && alg.GetString() == "ES256";
+            if (
+                !header.RootElement.TryGetProperty("alg", out var alg)
+                || alg.GetString() != "ES256"
+                || !header.RootElement.TryGetProperty("kid", out var kid)
+                || string.IsNullOrWhiteSpace(kid.GetString())
+            )
+                return false;
+
+            var payloadJson = Encoding.UTF8.GetString(Base64Url.DecodeFromChars(parts[1]));
+            using var payload = JsonDocument.Parse(payloadJson);
+
+            if (
+                !payload.RootElement.TryGetProperty("iss", out var iss)
+                || string.IsNullOrWhiteSpace(iss.GetString())
+                || !payload.RootElement.TryGetProperty("exp", out var exp)
+            )
+                return false;
+
+            var expiry = DateTimeOffset.FromUnixTimeSeconds(exp.GetInt64());
+            return expiry > DateTimeOffset.UtcNow.AddMinutes(5);
         }
-        catch
+        catch (FormatException)
+        {
+            return false;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (JsonException)
         {
             return false;
         }
@@ -128,7 +166,15 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache) : IDisposabl
 
             return null;
         }
-        catch
+        catch (FormatException)
+        {
+            return null;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+        catch (JsonException)
         {
             return null;
         }
@@ -139,6 +185,4 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache) : IDisposabl
 
     [GeneratedRegex(@"eyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}")]
     private static partial Regex JwtTokenRegex();
-
-    public void Dispose() => _httpClient.Dispose();
 }

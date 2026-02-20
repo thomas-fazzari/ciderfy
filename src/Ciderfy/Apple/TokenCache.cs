@@ -41,7 +41,15 @@ internal sealed class TokenCache
             var json = File.ReadAllText(CachePath);
             return JsonSerializer.Deserialize<TokenCache>(json) ?? new TokenCache();
         }
-        catch
+        catch (IOException)
+        {
+            return new TokenCache();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new TokenCache();
+        }
+        catch (JsonException)
         {
             return new TokenCache();
         }
@@ -55,7 +63,11 @@ internal sealed class TokenCache
             var json = JsonSerializer.Serialize(this, _serializerOptions);
             File.WriteAllText(CachePath, json);
         }
-        catch
+        catch (IOException)
+        {
+            // Best effort
+        }
+        catch (UnauthorizedAccessException)
         {
             // Best effort
         }
@@ -67,6 +79,13 @@ internal sealed class TokenCache
         DeveloperTokenExpiry = null;
         UserToken = null;
         UserTokenExpiry = null;
+        Save();
+    }
+
+    public void ClearDeveloperToken()
+    {
+        DeveloperToken = null;
+        DeveloperTokenExpiry = null;
         Save();
     }
 }

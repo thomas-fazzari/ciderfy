@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <PackageReference Include="F23.StringSimilarity" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
     <PackageReference Include="Otp.NET" />
     <PackageReference Include="Spectre.Console" />
   </ItemGroup>

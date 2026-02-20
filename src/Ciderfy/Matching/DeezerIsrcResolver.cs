@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text.Json;
+using Ciderfy.Configuration;
+using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Matching;
 
@@ -9,18 +11,17 @@ namespace Ciderfy.Matching;
 internal sealed class DeezerIsrcResolver : IDisposable
 {
     private const string SearchUrl = "https://api.deezer.com/search";
-    private const int RateLimitDelayMs = 110; // 9 req/sec, Deezer allows 10
 
     private readonly HttpClient _httpClient;
+    private readonly DeezerClientOptions _options;
     private readonly SemaphoreSlim _rateLimitLock = new(1, 1);
 
     private DateTimeOffset _lastCallTime = DateTimeOffset.MinValue;
 
-    public DeezerIsrcResolver()
+    public DeezerIsrcResolver(HttpClient httpClient, IOptions<DeezerClientOptions> options)
     {
-        var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All };
-        _httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
-        _httpClient.DefaultRequestHeaders.Add("User-Agent", "Ciderfy/1.0 (playlist transfer tool)");
+        _httpClient = httpClient;
+        _options = options.Value;
     }
 
     /// <summary>
@@ -82,7 +83,15 @@ internal sealed class DeezerIsrcResolver : IDisposable
 
             return await response.Content.ReadAsStringAsync(ct);
         }
-        catch
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+        catch (TaskCanceledException)
         {
             return null;
         }
@@ -94,9 +103,9 @@ internal sealed class DeezerIsrcResolver : IDisposable
         try
         {
             var elapsed = (DateTimeOffset.UtcNow - _lastCallTime).TotalMilliseconds;
-            if (elapsed < RateLimitDelayMs)
+            if (elapsed < _options.RateLimitDelayMs)
             {
-                var delay = RateLimitDelayMs - (int)elapsed;
+                var delay = _options.RateLimitDelayMs - (int)elapsed;
                 await Task.Delay(delay, ct);
             }
             _lastCallTime = DateTimeOffset.UtcNow;
@@ -109,7 +118,6 @@ internal sealed class DeezerIsrcResolver : IDisposable
 
     public void Dispose()
     {
-        _httpClient.Dispose();
         _rateLimitLock.Dispose();
     }
 }
