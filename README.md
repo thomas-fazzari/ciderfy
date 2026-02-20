@@ -3,6 +3,7 @@
 </p>
 
 <p align="center">
+  <a href="https://www.nuget.org/packages/Ciderfy"><img src="https://img.shields.io/nuget/v/Ciderfy" alt="NuGet"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/.NET-10.0-brightgreen" alt=".NET 10">
 </p>
@@ -19,7 +20,13 @@ A .NET 10 CLI tool to transfer Spotify playlists to Apple Music without any deve
 - Automatic Apple Music playlist creation and batched track insertion
 - Token caching to avoid reauthentication
 
-## Requirements
+## Installation
+
+```bash
+dotnet tool install -g Ciderfy
+```
+
+### Requirements
 
 - .NET SDK 10.0+
 - Apple Music account
@@ -56,15 +63,14 @@ flowchart TD
 ## Quick Start
 
 ```bash
-dotnet restore
-dotnet run --project src/Ciderfy
+ciderfy
 ```
 
-Or with Make targets:
+### From source
 
 ```bash
-make build
-make run
+dotnet restore
+dotnet run --project src/Ciderfy
 ```
 
 ## First-Time Authentication
