@@ -9,3 +9,6 @@ test:
 
 test-unit:
 	dotnet test --filter "Category!=Integration"
+
+pack:
+	dotnet pack src/Ciderfy -c Release -o ./artifacts

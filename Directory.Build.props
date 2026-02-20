@@ -3,7 +3,13 @@
     <Authors>Thomas Fazzari</Authors>
     <Copyright>Copyright © Thomas Fazzari 2026</Copyright>
     <Product>Ciderfy</Product>
+    <Description>CLI tool to transfer Spotify playlists to Apple Music without any developer accounts</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/thomas-fazzari/ciderfy</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/thomas-fazzari/ciderfy</RepositoryUrl>
+    <PackageTags>spotify;apple-music;playlist;cli;transfer</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <VersionPrefix>0.1.0</VersionPrefix>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -14,5 +20,9 @@
 
   <ItemGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">
     <InternalsVisibleTo Include="$(MSBuildProjectName).Tests" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

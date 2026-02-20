@@ -48,7 +48,11 @@ internal sealed class App : IAsyncDisposable
         AnsiConsole.MarkupLine(
             $"[dim]Paste a Spotify playlist URL to transfer, or type [{Accent}]/help[/][/]"
         );
-        PrintAuthStatus();
+        PrintAuthStatus(
+            _tokenCache.HasValidDeveloperToken,
+            _tokenCache.HasValidUserToken,
+            _storefront
+        );
         AnsiConsole.WriteLine();
 
         while (!_cts.IsCancellationRequested)
@@ -96,7 +100,6 @@ internal sealed class App : IAsyncDisposable
         return 0;
     }
 
-    /// <returns>false to exit the REPL</returns>
     private async Task<bool> HandleInputAsync(string input, CancellationToken ct)
     {
         if (input.StartsWith('/'))
@@ -140,11 +143,19 @@ internal sealed class App : IAsyncDisposable
 
             case "/auth":
                 await HandleAuthAsync(arg, ct);
-                PrintAuthStatus();
+                PrintAuthStatus(
+                    _tokenCache.HasValidDeveloperToken,
+                    _tokenCache.HasValidUserToken,
+                    _storefront
+                );
                 break;
 
             case "/status":
-                PrintAuthStatus();
+                PrintAuthStatus(
+                    _tokenCache.HasValidDeveloperToken,
+                    _tokenCache.HasValidUserToken,
+                    _storefront
+                );
                 break;
 
             case "/storefront"
@@ -383,18 +394,6 @@ internal sealed class App : IAsyncDisposable
         }
 
         return true;
-    }
-
-    private void PrintAuthStatus()
-    {
-        var devStatus = _tokenCache.HasValidDeveloperToken
-            ? $"[{Accent}]valid[/]"
-            : "[red]missing[/]";
-        var userStatus = _tokenCache.HasValidUserToken ? $"[{Accent}]valid[/]" : "[red]missing[/]";
-
-        AnsiConsole.MarkupLine(
-            $"  Developer token: {devStatus}  |  User token: {userStatus}  |  Storefront: [bold]{_storefront}[/]"
-        );
     }
 
     public ValueTask DisposeAsync()

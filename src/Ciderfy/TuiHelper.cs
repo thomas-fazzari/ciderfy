@@ -111,6 +111,20 @@ internal static class TuiHelper
         AnsiConsole.Write(table);
     }
 
+    internal static void PrintAuthStatus(
+        bool hasValidDeveloperToken,
+        bool hasValidUserToken,
+        string storefront
+    )
+    {
+        var devStatus = hasValidDeveloperToken ? $"[{Accent}]valid[/]" : "[red]missing[/]";
+        var userStatus = hasValidUserToken ? $"[{Accent}]valid[/]" : "[red]missing[/]";
+
+        AnsiConsole.MarkupLine(
+            $"  Developer token: {devStatus}  |  User token: {userStatus}  |  Storefront: [bold]{storefront}[/]"
+        );
+    }
+
     internal static string Truncate(string s, int max) =>
         s.Length <= max ? s : string.Concat(s.AsSpan(0, max - 1), "\u2026");
 
