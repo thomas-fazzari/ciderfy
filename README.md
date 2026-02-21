@@ -39,7 +39,7 @@ An Apple Music developer token is automatically extracted from the web player's 
 
 ISRCs (International Standard Recording Codes) are then resolved through the Deezer catalog and used to find exact matches in the Apple Music catalog
 
-Tracks that weren't matched can then go through an optional fuzzy matching pass that compares titles and artists using Jaro-Winkler string similarity
+Tracks that weren't matched can then go through an optional fuzzy matching pass that scores title and artist similarity using Jaro-Winkler, then scales the result down based on track duration difference to reduce false positives
 
 ### Transfer Flow
 
