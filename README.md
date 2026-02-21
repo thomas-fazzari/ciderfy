@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="./docs/assets/ciderfy-banner.svg" alt="Ciderfy terminal banner" width="700">
+  <img src="./docs/assets/banner.png" alt="Ciderfy terminal banner" width="600">
 </p>
 
 <p align="center">
-  <a href="https://www.nuget.org/packages/Ciderfy"><img src="https://img.shields.io/nuget/v/Ciderfy" alt="NuGet"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/.NET-10.0-brightgreen" alt=".NET 10">
+  <a href="https://www.nuget.org/packages/Ciderfy"><img src="https://img.shields.io/nuget/v/Ciderfy?style=flat-square&labelColor=151515&color=00C853" alt="NuGet"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-00C853?style=flat-square&labelColor=151515" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/.NET-10.0-00C853?style=flat-square&labelColor=151515" alt=".NET 10">
 </p>
 
 A .NET 10 CLI tool to transfer Spotify playlists to Apple Music without any developer accounts required

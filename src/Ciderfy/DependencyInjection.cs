@@ -3,6 +3,7 @@ using Ciderfy.Apple;
 using Ciderfy.Configuration;
 using Ciderfy.Matching;
 using Ciderfy.Spotify;
+using Ciderfy.Tui;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -13,7 +14,7 @@ internal static class DependencyInjection
     internal static IServiceCollection AddCiderfy(this IServiceCollection services)
     {
         services.AddSingleton(TokenCache.Load());
-        services.AddTransient<App>();
+        services.AddTransient<TuiApp>();
         services.AddTransient<TrackMatcher>();
         services.AddTransient<PlaylistTransferService>();
         services.AddTransient<CookieContainer>();
