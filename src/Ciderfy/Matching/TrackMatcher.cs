@@ -34,8 +34,12 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
 
         queries.Add(cleanTitle);
 
+        var seen = new HashSet<string>(queries.Count, StringComparer.Ordinal);
         foreach (var query in queries)
         {
+            if (!seen.Add(query))
+                continue;
+
             var match = await TryTextMatchAsync(spotifyTrack, query, storefront, ct);
             if (match is not null)
                 return match;
