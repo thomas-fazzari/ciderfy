@@ -52,14 +52,36 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     }
 
     /// <summary>
-    /// Computes a weighted similarity score between a Spotify track and an Apple Music track with title = 60%, artist = 40%
+    /// Computes a weighted similarity score between a Spotify track and an Apple Music track with title = 60%, artist = 40%,
+    /// then applies a multiplier based on the duration for  duration mismatches
     /// </summary>
     internal static double CalculateSimilarity(TrackMetadata spotify, AppleMusicTrack apple)
     {
         var titleScore = TitleSimilarity(spotify.Title, apple.Title);
         var artistScore = ArtistSimilarity(spotify.Artist, apple.Artist);
+        var textScore = (titleScore * 0.6) + (artistScore * 0.4);
 
-        return (titleScore * 0.6) + (artistScore * 0.4);
+        return textScore * DurationMultiplier(spotify.DurationMs, apple.DurationMs);
+    }
+
+    /// <summary>
+    /// Returns a multiplier between 0.7 and 1 based on how close two track durations are
+    /// </summary>
+    internal static double DurationMultiplier(int spotifyMs, int appleMs)
+    {
+        if (spotifyMs <= 0 || appleMs <= 0)
+            return 1.0;
+
+        var diffSeconds = Math.Abs(spotifyMs - appleMs) / 1000.0;
+
+        return diffSeconds switch
+        {
+            <= 5 => 1.0,
+            <= 15 => 0.95,
+            <= 30 => 0.90,
+            <= 60 => 0.80,
+            _ => 0.70,
+        };
     }
 
     /// <summary>

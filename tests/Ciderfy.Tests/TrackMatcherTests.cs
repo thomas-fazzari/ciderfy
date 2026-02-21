@@ -318,4 +318,70 @@ public class TrackMatcherTests
         var result2 = TrackMatcher.CalculateSimilarity(spotify2, apple2);
         Assert.True(result2 >= 0.7, $"Expected >= 0.7 but got {result2}");
     }
+
+    [Theory]
+    [InlineData(240_000, 240_000, 1.0)]
+    [InlineData(240_000, 243_000, 1.0)] // 3s
+    [InlineData(240_000, 250_000, 0.95)] // 10s
+    [InlineData(240_000, 260_000, 0.90)] // 20s
+    [InlineData(240_000, 290_000, 0.80)] // 50s
+    [InlineData(240_000, 340_000, 0.70)] // 100s
+    [InlineData(0, 240_000, 1.0)] // unknown spotify duration
+    [InlineData(240_000, 0, 1.0)] // unknown apple duration
+    [InlineData(0, 0, 1.0)] // both unknown
+    public void DurationMultiplier_ReturnsExpectedValue(int spotifyMs, int appleMs, double expected)
+    {
+        Assert.Equal(expected, TrackMatcher.DurationMultiplier(spotifyMs, appleMs));
+    }
+
+    [Fact]
+    public void CalculateSimilarity_IdenticalSong_LargeDurationDiff_PenalizesScore()
+    {
+        var spotify = TrackFakers
+            .SpotifyTrackWithDuration(240_000)
+            .RuleFor(t => t.Title, "Song A")
+            .RuleFor(t => t.Artist, "Artist A")
+            .Generate();
+
+        var apple = TrackFakers
+            .AppleTrackWithDuration(420_000)
+            .RuleFor(t => t.Title, "Song A")
+            .RuleFor(t => t.Artist, "Artist A")
+            .Generate();
+
+        var result = TrackMatcher.CalculateSimilarity(spotify, apple);
+        Assert.Equal(0.70, result, precision: 2);
+    }
+
+    [Fact]
+    public void CalculateSimilarity_ModerateDurationDiff_CanDropBelowThreshold()
+    {
+        // Borderline text match with a duration difference that should drop below 0.7
+        var spotify = TrackFakers
+            .SpotifyTrackWithDuration(200_000)
+            .RuleFor(t => t.Title, "War Pigs")
+            .RuleFor(t => t.Artist, "Black Sabbath")
+            .Generate();
+        var apple = TrackFakers
+            .AppleTrackWithDuration(245_000) // 45s
+            .RuleFor(t => t.Title, "War Pigs / Luke's Wall")
+            .RuleFor(t => t.Artist, "Black Sabbath")
+            .Generate();
+
+        var textOnly = TrackMatcher.CalculateSimilarity(
+            TrackFakers
+                .SpotifyTrack.Clone()
+                .RuleFor(t => t.Title, "War Pigs")
+                .RuleFor(t => t.Artist, "Black Sabbath")
+                .Generate(),
+            TrackFakers
+                .AppleTrack.Clone()
+                .RuleFor(t => t.Title, "War Pigs / Luke's Wall")
+                .RuleFor(t => t.Artist, "Black Sabbath")
+                .Generate()
+        );
+        var withDuration = TrackMatcher.CalculateSimilarity(spotify, apple);
+
+        Assert.True(withDuration < textOnly, $"Expected {withDuration} < {textOnly}");
+    }
 }
