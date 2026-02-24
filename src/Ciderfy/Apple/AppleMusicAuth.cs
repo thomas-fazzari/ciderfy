@@ -67,10 +67,8 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
             {
                 var js = await _httpClient.GetStringAsync(fullUrl, ct);
 
-                foreach (Match jwtMatch in JwtTokenRegex().Matches(js))
+                foreach (var token in JwtTokenRegex().Matches(js).Select(m => m.Value))
                 {
-                    var token = jwtMatch.Value;
-
                     if (!IsAppleMusicJwt(token))
                         continue;
 

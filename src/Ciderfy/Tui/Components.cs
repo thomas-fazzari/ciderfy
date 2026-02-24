@@ -11,22 +11,37 @@ internal static class Components
 {
     private static readonly string[] _bannerLines =
     [
-        "     ██████╗██╗██████╗ ███████╗██████╗ ███████╗██╗   ██╗",
-        "    ██╔════╝██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝",
-        "    ██║     ██║██║  ██║█████╗  ██████╔╝█████╗   ╚████╔╝ ",
-        "    ██║     ██║██║  ██║██╔══╝  ██╔══██╗██╔══╝    ╚██╔╝  ",
-        "    ╚██████╗██║██████╔╝███████╗██║  ██║██║        ██║   ",
-        "     ╚═════╝╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝        ╚═╝   ",
+        " ██████╗██╗██████╗ ███████╗██████╗ ███████╗██╗   ██╗",
+        "██╔════╝██║██╔══██╗██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝",
+        "██║     ██║██║  ██║█████╗  ██████╔╝█████╗   ╚████╔╝ ",
+        "██║     ██║██║  ██║██╔══╝  ██╔══██╗██╔══╝    ╚██╔╝  ",
+        "╚██████╗██║██████╔╝███████╗██║  ██║██║        ██║   ",
+        " ╚═════╝╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝        ╚═╝   ",
     ];
 
-    internal static IRenderable RenderBanner()
+    internal static IRenderable RenderBanner(int width)
     {
-        var rows = new List<IRenderable>();
-        for (var i = 0; i < _bannerLines.Length; i++)
+        var normalizedLines = _bannerLines.Select(static line => line.TrimEnd()).ToArray();
+        var bannerWidth = normalizedLines.Max(static line => line.Length);
+
+        if (width < bannerWidth)
+        {
+            const string compactBanner = "CIDERFY";
+            var compactPadding = Math.Max(0, (width - compactBanner.Length) / 2);
+            return new Markup(
+                $"[{Theme.Primary} bold]{new string(' ', compactPadding)}{compactBanner}[/]"
+            );
+        }
+
+        var leftPadding = Math.Max(0, (width - bannerWidth) / 2);
+        var rows = new List<IRenderable>(normalizedLines.Length);
+
+        for (var i = 0; i < normalizedLines.Length; i++)
         {
             var color = Theme.BannerColors[i];
             var bold = i is 2 or 3 ? " bold" : "";
-            rows.Add(new Markup($"[{color}{bold}]{Markup.Escape(_bannerLines[i])}[/]"));
+            var centeredLine = string.Concat(new string(' ', leftPadding), normalizedLines[i]);
+            rows.Add(new Markup($"[{color}{bold}]{Markup.Escape(centeredLine)}[/]"));
         }
 
         return new Rows(rows);
@@ -65,11 +80,11 @@ internal static class Components
     internal static IRenderable RenderLogArea(LogBuffer logs, int width, int height)
     {
         var visible = logs.GetVisible(height);
-        var lines = new List<string>(visible.Length);
+        var lines = new List<string>(height);
 
         foreach (var entry in visible)
         {
-            var escaped = Markup.Escape(entry.Message);
+            var escaped = Markup.Escape(Truncate(entry.Message, width));
             lines.Add(
                 entry.Kind switch
                 {
@@ -83,6 +98,9 @@ internal static class Components
 
         if (lines.Count == 0)
             lines.Add($"[{Theme.Muted}]No activity yet[/]");
+
+        while (lines.Count < height)
+            lines.Add("");
 
         return new Markup(string.Join('\n', lines));
     }
