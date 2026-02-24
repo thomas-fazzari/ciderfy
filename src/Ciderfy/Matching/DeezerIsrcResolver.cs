@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text.Json;
-using Ciderfy.Configuration;
+using Ciderfy.Configuration.Options;
 using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Matching;

@@ -6,7 +6,7 @@ namespace Ciderfy.Spotify;
 /// <remarks>
 /// Supports standard URLs, embed URLs, internationalized URLs (intl-*), and 'spotify:' URIs
 /// </remarks>
-internal record SpotifyUrlInfo(SpotifyUrlType Type, string Id)
+internal record SpotifyUrlInfo(string Id)
 {
     private const string SpotifyUriScheme = "spotify:";
     private const string SpotifyDomain = "spotify.com";
@@ -42,9 +42,7 @@ internal record SpotifyUrlInfo(SpotifyUrlType Type, string Id)
         var typeSpan = afterScheme[..separatorIndex];
         var id = afterScheme[(separatorIndex + 1)..];
 
-        return TryParseType(typeSpan, out var type)
-            ? new SpotifyUrlInfo(type, id.ToString())
-            : null;
+        return IsPlaylistType(typeSpan) ? new SpotifyUrlInfo(id.ToString()) : null;
     }
 
     private static SpotifyUrlInfo? ParseSpotifyUrl(string url)
@@ -77,13 +75,11 @@ internal record SpotifyUrlInfo(SpotifyUrlType Type, string Id)
         if (id.IsEmpty)
             return null;
 
-        return TryParseType(typeSpan, out var type)
-            ? new SpotifyUrlInfo(type, id.ToString())
-            : null;
+        return IsPlaylistType(typeSpan) ? new SpotifyUrlInfo(id.ToString()) : null;
     }
 
-    private static bool TryParseType(ReadOnlySpan<char> typeStr, out SpotifyUrlType type) =>
-        Enum.TryParse(typeStr, ignoreCase: true, out type);
+    private static bool IsPlaylistType(ReadOnlySpan<char> typeStr) =>
+        typeStr.Equals("playlist", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsSpotifyHost(string host) =>
         host.Equals(SpotifyDomain, StringComparison.OrdinalIgnoreCase)

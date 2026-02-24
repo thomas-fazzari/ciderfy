@@ -1,4 +1,4 @@
-using Ciderfy.Configuration;
+using Ciderfy.Configuration.Options;
 using Ciderfy.Matching;
 using Microsoft.Extensions.Options;
 using Xunit;

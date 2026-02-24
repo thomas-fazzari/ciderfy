@@ -1,11 +1,16 @@
-using Ciderfy;
+using Ciderfy.DependencyInjection;
 using Ciderfy.Tui;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
-var services = new ServiceCollection();
-services.AddCiderfy();
+var builder = Host.CreateApplicationBuilder(args);
+builder.Services.AddCiderfy(builder.Configuration);
 
-await using var provider = services.BuildServiceProvider();
-var app = provider.GetRequiredService<TuiApp>();
+using var host = builder.Build();
+await host.StartAsync();
 
-return await app.RunAsync();
+var app = host.Services.GetRequiredService<TuiApp>();
+var exitCode = await app.RunAsync();
+
+await host.StopAsync();
+return exitCode;

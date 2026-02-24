@@ -399,21 +399,10 @@ internal sealed class TuiApp(
 
         if (SpotifyUrlInfo.TryParse(raw, out var urlInfo) && urlInfo is not null)
         {
-            if (urlInfo.Type != SpotifyUrlType.Playlist)
-            {
-                _logs.Append(
-                    LogKind.Error,
-                    "Only playlist URLs are supported. Paste a Spotify playlist URL."
-                );
-            }
-            else
-            {
-                ResetTransferState();
-                _phase = TuiTransferPhase.FetchingPlaylist;
-                _logs.Append(LogKind.Info, "Starting transfer...");
-                _ = Task.Run(() => RunFetchPlaylistAsync(urlInfo.Id, _cts.Token));
-            }
-
+            ResetTransferState();
+            _phase = TuiTransferPhase.FetchingPlaylist;
+            _logs.Append(LogKind.Info, "Starting transfer...");
+            _ = Task.Run(() => RunFetchPlaylistAsync(urlInfo.Id, _cts.Token));
             return;
         }
 

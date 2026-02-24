@@ -1,5 +1,5 @@
 using Ciderfy.Apple;
-using Ciderfy.Configuration;
+using Ciderfy.Configuration.Options;
 using Microsoft.Extensions.Options;
 using Xunit;
 
