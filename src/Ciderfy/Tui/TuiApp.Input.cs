@@ -15,6 +15,9 @@ internal sealed partial class TuiApp
             if (HandleQuitShortcut(key))
                 return;
 
+            if (TryHandlePlaylistConfirmInput(key))
+                continue;
+
             if (TryHandleConfirmPhaseInput(key))
                 continue;
 
@@ -48,6 +51,28 @@ internal sealed partial class TuiApp
 
         _quit = true;
         _cts.Cancel();
+        return true;
+    }
+
+    private bool TryHandlePlaylistConfirmInput(ConsoleKeyInfo key)
+    {
+        if (_phase is not TuiTransferPhase.ConfirmPlaylist)
+            return false;
+
+        if (key.Key is ConsoleKey.Enter)
+        {
+            _phase = TuiTransferPhase.ResolvingIsrc;
+            _progressCurrent = 0;
+            _progressTotal = _transferTracks?.Count ?? 0;
+            _logs.Append(LogKind.Info, "Starting ISRC matching...");
+            _ = Task.Run(() => RunIsrcMatchAsync(_cts.Token));
+        }
+        else if (key.Key is ConsoleKey.Escape or ConsoleKey.Backspace)
+        {
+            ResetTransferState();
+            _logs.Append(LogKind.Info, "Transfer cancelled.");
+        }
+
         return true;
     }
 

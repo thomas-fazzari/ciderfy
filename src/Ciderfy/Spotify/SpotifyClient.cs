@@ -320,11 +320,22 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             ? uri.GetString()?.Split(':').LastOrDefault() ?? ""
             : "";
 
-    private static int ExtractDuration(JsonElement element) =>
-        element.TryGetProperty("trackDuration", out var dur)
-        && dur.TryGetProperty("totalMilliseconds", out var ms)
-            ? ms.GetInt32()
-            : 0;
+    private static int ExtractDuration(JsonElement element)
+    {
+        if (
+            !element.TryGetProperty("trackDuration", out var duration)
+            || !duration.TryGetProperty("totalMilliseconds", out var milliseconds)
+        )
+            return 0;
+
+        return milliseconds.ValueKind switch
+        {
+            JsonValueKind.Number when milliseconds.TryGetInt32(out var numericMs) => numericMs,
+            JsonValueKind.String when int.TryParse(milliseconds.GetString(), out var stringMs) =>
+                stringMs,
+            _ => 0,
+        };
+    }
 
     [GeneratedRegex(@"<script id=""appServerConfig"" type=""text/plain"">([^<]+)</script>")]
     private static partial Regex AppServerConfigRegex();

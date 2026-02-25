@@ -10,6 +10,7 @@ internal enum TuiTransferPhase
 {
     Idle,
     FetchingPlaylist,
+    ConfirmPlaylist,
     ResolvingIsrc,
     ConfirmTextMatch,
     TextMatching,

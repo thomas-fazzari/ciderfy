@@ -105,11 +105,9 @@ internal sealed partial class TuiApp
             LogKind.Success,
             $"Fetched \"{_playlistName}\" ({_transferTracks.Count} tracks)"
         );
+        _logs.Append(LogKind.Info, "Preview ready. Enter starts transfer, Esc goes back.");
 
-        _phase = TuiTransferPhase.ResolvingIsrc;
-        _progressCurrent = 0;
-        _progressTotal = _transferTracks.Count;
-        _ = Task.Run(() => RunIsrcMatchAsync(_cts.Token));
+        _phase = TuiTransferPhase.ConfirmPlaylist;
     }
 
     private void HandleIsrcDone(IsrcDoneMsg msg)

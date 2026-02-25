@@ -69,9 +69,9 @@ internal static class Components
         );
         var nameBadge = string.IsNullOrWhiteSpace(nextPlaylistName)
             ? Badge("Name auto", Theme.BadgeNeutralFg, Theme.BadgeNeutralBg)
-            : Badge($"Name \"{nextPlaylistName}\"", Theme.BadgeNeutralFg, Theme.BadgeNeutralBg);
+            : Badge("Name custom", Theme.BadgeNeutralFg, Theme.BadgeNeutralBg);
 
-        return new Markup($"{devBadge} {userBadge} {sfBadge} {nameBadge}");
+        return Align.Center(new Markup($"{devBadge} {userBadge} {sfBadge} {nameBadge}"));
     }
 
     private static string Badge(string text, string fg, string bg) =>
@@ -174,15 +174,22 @@ internal static class Components
     internal static IRenderable RenderResultsTable(
         List<MatchResult> allResults,
         int scrollOffset,
-        int visibleRows
+        int visibleRows,
+        int width
     )
     {
+        const int tableChromeWidth = 10;
+        var indexWidth = Math.Max(2, allResults.Count.ToString().Length);
+        var contentWidth = Math.Max(18, width - tableChromeWidth);
+        var statusWidth = Math.Clamp(contentWidth / 3, 14, 26);
+        var trackWidth = Math.Max(12, contentWidth - indexWidth - statusWidth);
+
         var table = new Table();
         table.Border(TableBorder.Simple);
         table.BorderColor(Theme.GrayColor);
-        table.AddColumn(new TableColumn("[bold]#[/]").NoWrap());
-        table.AddColumn(new TableColumn("[bold]Track[/]"));
-        table.AddColumn(new TableColumn("[bold]Status[/]").NoWrap());
+        table.AddColumn(new TableColumn("[bold]#[/]") { Width = indexWidth }.NoWrap());
+        table.AddColumn(new TableColumn("[bold]Track[/]") { Width = trackWidth }.NoWrap());
+        table.AddColumn(new TableColumn("[bold]Status[/]") { Width = statusWidth }.NoWrap());
 
         var start = Math.Max(0, scrollOffset);
         var end = Math.Min(allResults.Count, start + visibleRows);
@@ -191,24 +198,30 @@ internal static class Components
         {
             var r = allResults[i];
             var trackLabel = Markup.Escape(
-                Truncate($"{r.SpotifyTrack.Artist} - {r.SpotifyTrack.Title}", 55)
+                Truncate($"{r.SpotifyTrack.Artist} - {r.SpotifyTrack.Title}", trackWidth)
             );
 
             switch (r)
             {
                 case MatchResult.Matched m:
-                    var detail = m.Method == "ISRC" ? "ISRC" : $"text {m.Confidence:F2}";
+                    var detail = m.Method == "ISRC" ? "ISRC" : $"Text {m.Confidence:F2}";
                     table.AddRow(
                         $"{i + 1}",
                         trackLabel,
-                        $"[{Theme.Accent}]{Markup.Escape(detail)}[/]"
+                        $"[{Theme.Accent}]{Markup.Escape(Truncate(detail, statusWidth))}[/]"
                     );
                     break;
                 case MatchResult.NotFound nf:
+                    var reason = nf.Reason.StartsWith(
+                        "Best match below threshold",
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                        ? $"Below threshold{nf.Reason["Best match below threshold".Length..]}"
+                        : nf.Reason;
                     table.AddRow(
                         $"{i + 1}",
                         trackLabel,
-                        $"[{Theme.Red}]{Markup.Escape(nf.Reason)}[/]"
+                        $"[{Theme.Red}]{Markup.Escape(Truncate(reason, statusWidth))}[/]"
                     );
                     break;
             }
@@ -229,7 +242,7 @@ internal static class Components
             $"[{Theme.Primary}]{matched}[/][{Theme.Muted}]/{total} tracks transferred[/]"
             + (notFound > 0 ? $"  [{Theme.Red}]{notFound} not found[/]" : "");
 
-        var header = success ? $" {Markup.Escape(name)} " : " Transfer failed ";
+        var header = success ? $" {Markup.Escape(Truncate(name, 48))} " : " Transfer failed ";
         var borderColor = success ? Theme.PrimaryColor : Theme.RedColor;
 
         return new Panel(new Markup(content))
@@ -286,6 +299,55 @@ internal static class Components
         return new Markup(
             $"[{Theme.Muted}]\u2191/\u2193 scroll[/]{posInfo}[{Theme.Muted}]  \u2022  Press Enter to start a new transfer[/]"
         );
+    }
+
+    internal static IRenderable RenderPlaylistConfirmation(
+        string name,
+        int trackCount,
+        string storefront
+    )
+    {
+        var safeName = string.IsNullOrWhiteSpace(name) ? "Spotify Import" : name.Trim();
+        var tracksLabel = trackCount == 1 ? "1 track" : $"{trackCount} tracks";
+        var safeStorefront = string.IsNullOrWhiteSpace(storefront)
+            ? "US"
+            : storefront.ToUpperInvariant();
+        const int nameMaxLength = 56;
+
+        var grid = new Grid();
+        grid.AddColumn(new GridColumn().NoWrap());
+        grid.AddColumn();
+
+        grid.AddRow(
+            new Markup($"[{Theme.Muted}]Name[/]"),
+            new Markup($"[{Theme.White}]{Markup.Escape(Truncate(safeName, nameMaxLength))}[/]")
+        );
+        grid.AddRow(
+            new Markup($"[{Theme.Muted}]Tracks[/]"),
+            new Markup($"[{Theme.White} on {Theme.PrimaryDark}] {Markup.Escape(tracksLabel)} [/]")
+        );
+        grid.AddRow(
+            new Markup($"[{Theme.Muted}]Storefront[/]"),
+            new Markup($"[{Theme.White}]{Markup.Escape(safeStorefront)}[/]")
+        );
+
+        return new Panel(
+            new Rows(
+                new Markup($"[{Theme.White} bold]Playlist preview[/]"),
+                new Text(""),
+                grid,
+                new Text(""),
+                new Markup(
+                    $"[{Theme.Primary}]Enter[/] start transfer  [{Theme.Muted}]Esc[/] back  [{Theme.Muted}]Ctrl+C[/] quit"
+                )
+            )
+        )
+        {
+            Border = BoxBorder.Rounded,
+            BorderStyle = new Style(Theme.GrayColor),
+            Padding = new Padding(1, 0),
+            Expand = false,
+        };
     }
 
     internal static string Truncate(string s, int max) =>

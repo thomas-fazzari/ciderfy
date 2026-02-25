@@ -32,10 +32,16 @@ internal sealed partial class TuiApp
         );
 
         // Main content area
-        var content =
-            _phase is TuiTransferPhase.Done
-                ? RenderDoneView(contentHeight)
-                : RenderActiveView(contentWidth, contentHeight);
+        var content = _phase switch
+        {
+            TuiTransferPhase.Done => RenderDoneView(contentWidth, contentHeight),
+            TuiTransferPhase.ConfirmPlaylist => Components.RenderPlaylistConfirmation(
+                _playlistName,
+                _transferTracks?.Count ?? 0,
+                _storefront
+            ),
+            _ => RenderActiveView(contentWidth, contentHeight),
+        };
 
         // Input
         IRenderable input;
@@ -133,7 +139,7 @@ internal sealed partial class TuiApp
         return logs;
     }
 
-    private IRenderable RenderDoneView(int contentHeight)
+    private IRenderable RenderDoneView(int width, int contentHeight)
     {
         if (_allResults is null || _transferTracks is null)
             return new Text("No results");
@@ -144,7 +150,7 @@ internal sealed partial class TuiApp
 
         var summary = Components.RenderSummaryPanel(_playlistName, matched, total, notFound);
         var visibleRows = Math.Max(3, contentHeight - DoneViewChromeHeight);
-        var table = Components.RenderResultsTable(_allResults, _scrollOffset, visibleRows);
+        var table = Components.RenderResultsTable(_allResults, _scrollOffset, visibleRows, width);
         var hint = Components.RenderScrollHint(_scrollOffset, _allResults.Count, visibleRows);
 
         return new Rows(summary, new Text(""), table, new Text(""), hint);
