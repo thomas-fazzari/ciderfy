@@ -1,6 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Ciderfy.Apple;
+
+[JsonSerializable(typeof(TokenCache))]
+internal sealed partial class TokenCacheJsonContext : JsonSerializerContext { }
 
 internal sealed class TokenCache
 {
@@ -10,11 +14,6 @@ internal sealed class TokenCache
     );
 
     private static string CachePath => Path.Combine(_cacheDir, "tokens.json");
-
-    private static readonly JsonSerializerOptions _serializerOptions = new()
-    {
-        WriteIndented = true,
-    };
 
     public string? DeveloperToken { get; set; }
     public DateTimeOffset? DeveloperTokenExpiry { get; set; }
@@ -39,7 +38,8 @@ internal sealed class TokenCache
                 return new TokenCache();
 
             var json = File.ReadAllText(CachePath);
-            return JsonSerializer.Deserialize<TokenCache>(json) ?? new TokenCache();
+            return JsonSerializer.Deserialize(json, TokenCacheJsonContext.Default.TokenCache)
+                ?? new TokenCache();
         }
         catch (IOException)
         {
@@ -60,7 +60,7 @@ internal sealed class TokenCache
         try
         {
             Directory.CreateDirectory(_cacheDir);
-            var json = JsonSerializer.Serialize(this, _serializerOptions);
+            var json = JsonSerializer.Serialize(this, TokenCacheJsonContext.Default.TokenCache);
             File.WriteAllText(CachePath, json);
         }
         catch (IOException)

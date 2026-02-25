@@ -1,4 +1,3 @@
-using System.Net;
 using System.Text.Json;
 using Ciderfy.Configuration.Options;
 using Microsoft.Extensions.Options;
@@ -8,21 +7,17 @@ namespace Ciderfy.Matching;
 /// <summary>
 /// Resolves ISRCs for tracks by searching the Deezer catalog
 /// </summary>
-internal sealed class DeezerIsrcResolver : IDisposable
+internal sealed class DeezerIsrcResolver(
+    HttpClient httpClient,
+    IOptions<DeezerClientOptions> options
+) : IDisposable
 {
     private const string SearchUrl = "https://api.deezer.com/search";
 
-    private readonly HttpClient _httpClient;
-    private readonly DeezerClientOptions _options;
+    private readonly DeezerClientOptions _options = options.Value;
     private readonly SemaphoreSlim _rateLimitLock = new(1, 1);
 
     private DateTimeOffset _lastCallTime = DateTimeOffset.MinValue;
-
-    public DeezerIsrcResolver(HttpClient httpClient, IOptions<DeezerClientOptions> options)
-    {
-        _httpClient = httpClient;
-        _options = options.Value;
-    }
 
     /// <summary>
     /// Resolves ISRCs for a batch of tracks using individual Deezer searches
@@ -36,21 +31,24 @@ internal sealed class DeezerIsrcResolver : IDisposable
         CancellationToken ct = default
     )
     {
-        var results = new List<TrackMetadata>(tracks.Count);
+        var results = new TrackMetadata[tracks.Count];
+        var completed = 0;
 
-        for (var i = 0; i < tracks.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
-            progress?.Report((i, tracks.Count));
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, tracks.Count),
+            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+            async (i, token) =>
+            {
+                var track = tracks[i];
+                var isrc = await FindIsrcAsync(track.Title, track.Artist, token);
+                results[i] = isrc is not null ? track with { Isrc = isrc } : track;
 
-            var track = tracks[i];
-            var isrc = await FindIsrcAsync(track.Title, track.Artist, ct);
+                var currentCount = Interlocked.Increment(ref completed);
+                progress?.Report((currentCount, tracks.Count));
+            }
+        );
 
-            results.Add(isrc is not null ? track with { Isrc = isrc } : track);
-        }
-
-        progress?.Report((tracks.Count, tracks.Count));
-        return results;
+        return [.. results];
     }
 
     private async Task<string?> FindIsrcAsync(string title, string artist, CancellationToken ct)
@@ -76,7 +74,7 @@ internal sealed class DeezerIsrcResolver : IDisposable
 
         try
         {
-            using var response = await _httpClient.GetAsync(url, ct);
+            using var response = await httpClient.GetAsync(url, ct);
 
             if (!response.IsSuccessStatusCode)
                 return null;

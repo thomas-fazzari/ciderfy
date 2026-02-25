@@ -87,20 +87,24 @@ internal sealed class PlaylistTransferService(
         CancellationToken ct = default
     )
     {
-        var results = new List<MatchResult>();
+        var results = new MatchResult[tracks.Count];
+        var completed = 0;
 
-        for (var i = 0; i < tracks.Count; i++)
-        {
-            ct.ThrowIfCancellationRequested();
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, tracks.Count),
+            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+            async (i, token) =>
+            {
+                var track = tracks[i];
+                var result = await matcher.MatchTrackByTextAsync(track, storefront, token);
+                results[i] = result;
 
-            var track = tracks[i];
-            progress?.Report(new TrackMatchProgress(track, i));
+                var currentCount = Interlocked.Increment(ref completed);
+                progress?.Report(new TrackMatchProgress(track, currentCount));
+            }
+        );
 
-            var result = await matcher.MatchTrackByTextAsync(track, storefront, ct);
-            results.Add(result);
-        }
-
-        return results;
+        return [.. results];
     }
 
     /// <summary>
