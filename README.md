@@ -14,6 +14,7 @@ A .NET 10 CLI tool to transfer Spotify playlists to Apple Music without any deve
 
 - Interactive modern CLI built with Spectre.Console
 - Spotify playlist import from standard URLs, embed URLs, intl URLs, and `spotify:` URIs
+- Playlist Merging: Queue multiple Spotify playlists with `/add <url>` and merge them into a single deduplicated Apple Music playlist with `/run`
 - Two-stage matching pipeline:
   - ISRC-based matching (resolved via the Deezer catalog, since Spotify does not expose ISRCs publicly)
   - Optional fuzzy matching for remaining tracks
@@ -97,13 +98,21 @@ Ciderfy will also automatically fetch and cache a valid Apple Music developer to
 
 ## Usage
 
-After startup, paste a Spotify playlist URL, for example:
+After startup, paste a Spotify playlist URL for a direct transfer:
 
 ```text
 https://open.spotify.com/playlist/<playlist-id>
 ```
 
-You can set storefront and playlist naming behavior before transfer using commands below
+Or queue multiple playlists to merge them into one:
+
+```text
+/add https://open.spotify.com/playlist/<id-1>
+/add https://open.spotify.com/playlist/<id-2>
+/run
+```
+
+You can set storefront and playlist naming behavior before transfer using commands below.
 
 ## Commands
 
@@ -111,6 +120,8 @@ You can set storefront and playlist naming behavior before transfer using comman
 - `/auth reset` - clear cached tokens and re-authenticate
 - `/status` - show tokens and storefront status
 - `/storefront <code>` or `/sf <code>` - set Apple Music storefront (default: `us`)
+- `/add <url>` - queue a Spotify playlist for merging
+- `/run` - start the transfer and merge all queued playlists
 - `/name <name>` - set name override for the next created playlist
 - `/name` - clear name override
 - `/help` or `/h` - show command help

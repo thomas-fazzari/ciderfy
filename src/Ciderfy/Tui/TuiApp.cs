@@ -29,6 +29,9 @@ internal sealed partial class TuiApp(
     private bool _showHelp;
     private bool _quit;
 
+    // Queue data
+    private readonly List<string> _queuedPlaylistUrls = [];
+
     // Spinner and progress
     private int _spinnerTick;
     private int _progressCurrent;
@@ -165,7 +168,7 @@ internal sealed partial class TuiApp(
         }
     }
 
-    private async Task RunFetchPlaylistAsync(string playlistId, CancellationToken ct)
+    private async Task RunFetchPlaylistAsync(List<string> playlistIds, CancellationToken ct)
     {
         try
         {
@@ -176,19 +179,22 @@ internal sealed partial class TuiApp(
             {
                 _channel.Writer.TryWrite(
                     new PlaylistFetchedMsg(
-                        null,
+                        [],
                         new InvalidOperationException("User token missing. Run /auth first.")
                     )
                 );
                 return;
             }
 
-            var playlist = await transferService.FetchSpotifyPlaylistAsync(playlistId, ct);
-            _channel.Writer.TryWrite(new PlaylistFetchedMsg(playlist, null));
+            var fetchTasks = playlistIds.Select(id =>
+                transferService.FetchSpotifyPlaylistAsync(id, ct)
+            );
+            var playlists = await Task.WhenAll(fetchTasks);
+            _channel.Writer.TryWrite(new PlaylistFetchedMsg([.. playlists], null));
         }
         catch (Exception ex)
         {
-            _channel.Writer.TryWrite(new PlaylistFetchedMsg(null, ex));
+            _channel.Writer.TryWrite(new PlaylistFetchedMsg([], ex));
         }
     }
 

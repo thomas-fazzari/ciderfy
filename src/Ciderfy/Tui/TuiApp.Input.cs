@@ -115,7 +115,7 @@ internal sealed partial class TuiApp
 
         var visibleRows = Math.Max(
             3,
-            Console.WindowHeight - FixedChromeHeight - DoneViewChromeHeight
+            Console.WindowHeight - CurrentFixedChromeHeight - DoneViewChromeHeight
         );
         _scrollOffset = Math.Min(Math.Max(0, _allResults.Count - visibleRows), _scrollOffset + 1);
     }
@@ -211,10 +211,20 @@ internal sealed partial class TuiApp
 
         if (SpotifyUrlInfo.TryParse(raw, out var urlInfo) && urlInfo is not null)
         {
+            if (_queuedPlaylistUrls.Count > 0)
+            {
+                _queuedPlaylistUrls.Add(urlInfo.Id);
+                _logs.Append(
+                    LogKind.Success,
+                    $"Added to merge queue (Total: {_queuedPlaylistUrls.Count}). Type /run to start."
+                );
+                return;
+            }
+
             ResetTransferState();
             _phase = TuiTransferPhase.FetchingPlaylist;
             _logs.Append(LogKind.Info, "Starting transfer...");
-            _ = Task.Run(() => RunFetchPlaylistAsync(urlInfo.Id, _cts.Token));
+            _ = Task.Run(() => RunFetchPlaylistAsync([urlInfo.Id], _cts.Token));
             return;
         }
 
@@ -264,6 +274,8 @@ internal sealed partial class TuiApp
         _commands.Register(HandleStorefrontCommand, "/storefront", "/sf");
         _commands.Register(HandleNameCommand, "/name");
         _commands.Register(HandleAuthCommand, "/auth");
+        _commands.Register(HandleAddCommand, "/add");
+        _commands.Register(HandleRunCommand, "/run");
 
         _commandsRegistered = true;
     }
@@ -313,5 +325,65 @@ internal sealed partial class TuiApp
 
         _logs.Append(LogKind.Info, "Authenticating...");
         _ = Task.Run(() => RunAuthAsync(_cts.Token));
+    }
+
+    private void HandleAddCommand(string? argument)
+    {
+        if (string.IsNullOrWhiteSpace(argument))
+        {
+            _logs.Append(LogKind.Error, "Usage: /add <url1> [url2] ...");
+            return;
+        }
+
+        var urls = argument.Split(
+            ' ',
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+        );
+        var addedCount = 0;
+
+        foreach (var url in urls)
+        {
+            if (SpotifyUrlInfo.TryParse(url, out var urlInfo) && urlInfo is not null)
+            {
+                if (!_queuedPlaylistUrls.Contains(urlInfo.Id))
+                {
+                    _queuedPlaylistUrls.Add(urlInfo.Id);
+                    addedCount++;
+                }
+            }
+        }
+
+        if (addedCount > 0)
+        {
+            _logs.Append(
+                LogKind.Success,
+                $"Added {addedCount} playlists to queue. ({_queuedPlaylistUrls.Count} total)"
+            );
+            _logs.Append(LogKind.Info, "Type /run to start merging.");
+        }
+        else
+        {
+            _logs.Append(LogKind.Error, "No valid Spotify URLs found.");
+        }
+    }
+
+    private void HandleRunCommand(string? argument)
+    {
+        if (_queuedPlaylistUrls.Count == 0)
+        {
+            _logs.Append(LogKind.Error, "Queue is empty. Add playlists with /add <url>");
+            return;
+        }
+
+        var playlistIdsToFetch = _queuedPlaylistUrls.ToList();
+        _queuedPlaylistUrls.Clear();
+
+        ResetTransferState();
+        _phase = TuiTransferPhase.FetchingPlaylist;
+        _logs.Append(
+            LogKind.Info,
+            $"Starting transfer of {playlistIdsToFetch.Count} merged playlists..."
+        );
+        _ = Task.Run(() => RunFetchPlaylistAsync(playlistIdsToFetch, _cts.Token));
     }
 }

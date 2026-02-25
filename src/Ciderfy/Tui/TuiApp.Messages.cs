@@ -83,27 +83,16 @@ internal sealed partial class TuiApp
             return;
         }
 
-        var playlist = msg.Playlist!;
-        _transferTracks =
-        [
-            .. playlist.Tracks.Select(t => new TrackMetadata
-            {
-                SpotifyId = t.SpotifyId,
-                Title = t.Title,
-                Artist = t.Artist,
-                DurationMs = t.DurationMs,
-            }),
-        ];
+        var playlists = msg.Playlists;
 
-        _playlistName = string.IsNullOrWhiteSpace(_nextPlaylistName)
-            ? playlist.Name
-            : _nextPlaylistName;
-        if (string.IsNullOrWhiteSpace(_playlistName))
-            _playlistName = "Spotify Import";
+        _transferTracks = PlaylistMerger.MergeTracks(playlists);
+        _playlistName = PlaylistMerger.ResolveName(playlists, _nextPlaylistName);
+
+        var mergeInfo = playlists.Count > 1 ? $"Merged {playlists.Count} playlists - " : "";
 
         _logs.Append(
             LogKind.Success,
-            $"Fetched \"{_playlistName}\" ({_transferTracks.Count} tracks)"
+            $"Fetched \"{_playlistName}\" ({mergeInfo}{_transferTracks.Count} tracks)"
         );
         _logs.Append(LogKind.Info, "Preview ready. Enter starts transfer, Esc goes back.");
 

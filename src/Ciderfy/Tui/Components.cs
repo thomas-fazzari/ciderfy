@@ -274,12 +274,17 @@ internal static class Components
             "Set playlist name for next transfer"
         );
         table.AddRow($"[{Theme.Primary}]/name[/]", "Clear playlist name override");
+        table.AddRow(
+            $"[{Theme.Primary}]/add[/] [{Theme.Muted}]<url>[/]",
+            "Queue a Spotify playlist to merge multiple"
+        );
+        table.AddRow($"[{Theme.Primary}]/run[/]", "Start transferring the queued playlists");
         table.AddRow($"[{Theme.Primary}]/help[/]", "Show this help");
         table.AddRow($"[{Theme.Primary}]/quit[/]", "Exit");
         table.AddRow("", "");
         table.AddRow(
             $"[{Theme.Primary}]<spotify-url>[/]",
-            "Paste a Spotify playlist URL to transfer"
+            "Paste a Spotify playlist URL to transfer directly"
         );
 
         return table;
@@ -287,8 +292,19 @@ internal static class Components
 
     internal static IRenderable RenderFooter() =>
         new Markup(
-            $"[{Theme.Muted}]Commands: /help /auth /auth reset /status /storefront <code> /name <name> /quit[/]"
+            $"[{Theme.Muted}]Commands: /help /auth /add /run /status /storefront <code> /name <name> /quit[/]"
         );
+
+    internal static IRenderable RenderConfirmationFooter(TuiTransferPhase phase) =>
+        phase switch
+        {
+            TuiTransferPhase.ConfirmTextMatch => new Markup(
+                $"[{Theme.Primary}]Enter/Y[/] start matching  [{Theme.Muted}]N[/] skip  [{Theme.Muted}]Ctrl+C[/] quit"
+            ),
+            _ => new Markup(
+                $"[{Theme.Primary}]Enter[/] start transfer  [{Theme.Muted}]Esc[/] back  [{Theme.Muted}]Ctrl+C[/] quit"
+            ),
+        };
 
     internal static IRenderable RenderScrollHint(int offset, int total, int visible)
     {
@@ -332,15 +348,7 @@ internal static class Components
         );
 
         return new Panel(
-            new Rows(
-                new Markup($"[{Theme.White} bold]Playlist preview[/]"),
-                new Text(""),
-                grid,
-                new Text(""),
-                new Markup(
-                    $"[{Theme.Primary}]Enter[/] start transfer  [{Theme.Muted}]Esc[/] back  [{Theme.Muted}]Ctrl+C[/] quit"
-                )
-            )
+            new Rows(new Markup($"[{Theme.White} bold]Playlist preview[/]"), new Text(""), grid)
         )
         {
             Border = BoxBorder.Rounded,

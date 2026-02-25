@@ -7,8 +7,9 @@ namespace Ciderfy.Tui;
 internal sealed partial class TuiApp
 {
     // Lines consumed by fixed UI elements (everything except the content area).
-    // Panel border (2) + Banner(6) + Rule (1) + Badges (1) + Gaps(2) + Input panel (3) + Footer (1)
-    private const int FixedChromeHeight = 2 + 6 + 1 + 1 + 2 + 3 + 1;
+    private int CurrentFixedChromeHeight => 2 + 6 + 1 + 1 + 1 + (ShowInput ? 4 : 0) + 1;
+    private bool ShowInput =>
+        _awaitingUserToken || _phase is TuiTransferPhase.Idle or TuiTransferPhase.Done;
 
     // Lines consumed within the Done view by non-table elements.
     // Summary panel (3) + Gap(1) + Table header and borders (3) + Gap (1) + Hint (1)
@@ -18,8 +19,9 @@ internal sealed partial class TuiApp
     {
         var width = Math.Max(24, Console.WindowWidth);
         var height = Console.WindowHeight;
+
         var contentWidth = Math.Max(20, width - 4);
-        var contentHeight = Math.Max(4, height - FixedChromeHeight);
+        var contentHeight = Math.Max(4, height - CurrentFixedChromeHeight);
 
         // Banner + separator + badges
         var banner = Components.RenderBanner(contentWidth);
@@ -43,32 +45,36 @@ internal sealed partial class TuiApp
             _ => RenderActiveView(contentWidth, contentHeight),
         };
 
-        // Input
-        IRenderable input;
-        if (_awaitingUserToken)
-            input = Components.RenderInputWithPrompt(
-                "token>",
-                _inputBuffer.ToString(),
-                _cursorVisible,
-                contentWidth
-            );
-        else
-            input = Components.RenderInput(_inputBuffer.ToString(), _cursorVisible, contentWidth);
+        var footer = _phase is TuiTransferPhase.ConfirmPlaylist or TuiTransferPhase.ConfirmTextMatch
+            ? Components.RenderConfirmationFooter(_phase)
+            : Components.RenderFooter();
 
-        var footer = Components.RenderFooter();
+        var rowsList = new List<IRenderable> { banner, separator, badges, new Text(""), content };
 
-        var rows = new Rows(
-            banner,
-            separator,
-            badges,
-            new Text(""),
-            content,
-            new Text(""),
-            input,
-            footer
-        );
+        if (ShowInput)
+        {
+            IRenderable input;
+            if (_awaitingUserToken)
+                input = Components.RenderInputWithPrompt(
+                    "token>",
+                    _inputBuffer.ToString(),
+                    _cursorVisible,
+                    contentWidth
+                );
+            else
+                input = Components.RenderInput(
+                    _inputBuffer.ToString(),
+                    _cursorVisible,
+                    contentWidth
+                );
 
-        return new Panel(rows)
+            rowsList.Add(new Text(""));
+            rowsList.Add(input);
+        }
+
+        rowsList.Add(footer);
+
+        return new Panel(new Rows(rowsList))
         {
             Border = BoxBorder.Rounded,
             BorderStyle = new Style(Theme.GrayColor),

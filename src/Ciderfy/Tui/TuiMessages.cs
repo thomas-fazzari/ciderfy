@@ -24,9 +24,10 @@ internal enum TuiTransferPhase
 internal abstract record TuiMessage;
 
 /// <summary>
-/// Signals that a Spotify playlist fetch completed or failed
+/// Signals that one or more Spotify playlists fetch completed or failed
 /// </summary>
-internal sealed record PlaylistFetchedMsg(SpotifyPlaylist? Playlist, Exception? Error) : TuiMessage;
+internal sealed record PlaylistFetchedMsg(List<SpotifyPlaylist> Playlists, Exception? Error)
+    : TuiMessage;
 
 /// <summary>
 /// Reports ISRC matching progress to update the progress bar
