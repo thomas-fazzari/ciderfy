@@ -1,5 +1,3 @@
-using System.Runtime.InteropServices;
-
 namespace Ciderfy.Tui;
 
 /// <summary>
@@ -23,25 +21,41 @@ internal readonly record struct LogEntry(LogKind Kind, string Message);
 /// </summary>
 internal sealed class LogBuffer(int capacity = 500)
 {
-    private readonly List<LogEntry> _entries = new(64);
+    private readonly LogEntry[] _entries = new LogEntry[capacity];
+    private int _head; // index of the oldest entry
+    private int _count; // number of valid entries
 
     /// <summary>
-    /// Appends a new log entry, evicting the oldest entries when capacity is exceeded
+    /// Appends a new log entry by overwriting the oldest one when capacity is reached
     /// </summary>
     internal void Append(LogKind kind, string message)
     {
-        _entries.Add(new LogEntry(kind, message.Trim()));
-        if (_entries.Count > capacity)
-            _entries.RemoveRange(0, _entries.Count - capacity);
+        var index = (_head + _count) % capacity;
+        _entries[index] = new LogEntry(kind, message.Trim());
+
+        if (_count < capacity)
+            _count++;
+        else
+            _head = (_head + 1) % capacity;
     }
 
     /// <summary>
     /// Returns the most recent entries that fit within the given height
     /// </summary>
-    internal ReadOnlySpan<LogEntry> GetVisible(int height) =>
-        _entries.Count <= height
-            ? CollectionsMarshal.AsSpan(_entries)
-            : CollectionsMarshal.AsSpan(_entries)[(_entries.Count - height)..];
+    internal ReadOnlySpan<LogEntry> GetVisible(int height)
+    {
+        var take = Math.Min(height, _count);
+        if (take == 0)
+            return [];
 
-    internal bool IsEmpty => _entries.Count == 0;
+        var buffer = new LogEntry[take];
+        var startOffset = _count - take; // how many entries to skip from the oldest
+
+        for (var i = 0; i < take; i++)
+            buffer[i] = _entries[(_head + startOffset + i) % capacity];
+
+        return buffer;
+    }
+
+    internal bool IsEmpty => _count == 0;
 }

@@ -1,13 +1,13 @@
 using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using Ciderfy.Configuration.Options;
 using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Apple;
 
-public sealed class AppleMusicRateLimitException(int? retryAfterSeconds = null)
+internal sealed class AppleMusicRateLimitException(int? retryAfterSeconds = null)
     : Exception(
         retryAfterSeconds is null
             ? "Apple Music rate limit exhausted"
@@ -17,7 +17,7 @@ public sealed class AppleMusicRateLimitException(int? retryAfterSeconds = null)
     public int? RetryAfterSeconds { get; } = retryAfterSeconds;
 }
 
-public sealed class AppleMusicUnauthorizedException()
+internal sealed class AppleMusicUnauthorizedException()
     : Exception("Apple Music returned 401 Unauthorized, developer token may have expired");
 
 internal sealed class AppleMusicClient(
@@ -29,11 +29,17 @@ internal sealed class AppleMusicClient(
     private const string ApiBaseUrl = "https://api.music.apple.com/v1";
 
     private readonly HttpClient _httpClient = httpClient;
-    private readonly AppleMusicClientOptions _options = options.Value;
     private readonly TokenCache _tokenCache = tokenCache;
-    private readonly SemaphoreSlim _rateLimitLock = new(1, 1);
-
-    private DateTimeOffset _lastCallTime = DateTimeOffset.MinValue;
+    private readonly RateLimiter _rateLimiter = new SlidingWindowRateLimiter(
+        new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 1,
+            Window = TimeSpan.FromMilliseconds(options.Value.MinDelayBetweenCallsMs),
+            SegmentsPerWindow = 1,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = int.MaxValue,
+        }
+    );
 
     public async Task<Dictionary<string, AppleMusicTrack>> BatchSearchByIsrcAsync(
         IReadOnlyList<string> isrcs,
@@ -41,7 +47,7 @@ internal sealed class AppleMusicClient(
         CancellationToken ct = default
     )
     {
-        ConfigureAuthHeaders(requireUserToken: false);
+        var authHeaders = GenerateAuthHeaders(requireUserToken: false);
 
         const int batchSize = 25;
         var result = new Dictionary<string, AppleMusicTrack>(StringComparer.OrdinalIgnoreCase);
@@ -53,7 +59,7 @@ internal sealed class AppleMusicClient(
             var end = Math.Min(i + batchSize, isrcs.Count);
             var joined = string.Join(',', isrcs.Take(new Range(i, end)));
             var url = $"{ApiBaseUrl}/catalog/{storefront}/songs?filter[isrc]={joined}";
-            var json = await GetWithRateLimitAsync(url, ct);
+            var json = await GetWithRateLimitAsync(url, authHeaders, ct);
 
             if (json is null)
                 continue;
@@ -80,12 +86,12 @@ internal sealed class AppleMusicClient(
         CancellationToken ct = default
     )
     {
-        ConfigureAuthHeaders(requireUserToken: false);
+        var authHeaders = GenerateAuthHeaders(requireUserToken: false);
 
         var encodedQuery = Uri.EscapeDataString(query);
         var url =
             $"{ApiBaseUrl}/catalog/{storefront}/search?types=songs&limit=10&term={encodedQuery}";
-        var json = await GetWithRateLimitAsync(url, ct);
+        var json = await GetWithRateLimitAsync(url, authHeaders, ct);
         var tracks = new List<AppleMusicTrack>();
 
         if (json is null)
@@ -116,7 +122,7 @@ internal sealed class AppleMusicClient(
         CancellationToken ct = default
     )
     {
-        ConfigureAuthHeaders(requireUserToken: true);
+        var authHeaders = GenerateAuthHeaders(requireUserToken: true);
 
         var payload = new
         {
@@ -130,7 +136,7 @@ internal sealed class AppleMusicClient(
         var json = JsonSerializer.Serialize(payload);
         var url = $"{ApiBaseUrl}/me/library/playlists";
 
-        var responseJson = await PostWithRateLimitAsync(url, json, ct);
+        var responseJson = await PostWithRateLimitAsync(url, json, authHeaders, ct);
 
         if (responseJson is null)
             return null;
@@ -149,7 +155,7 @@ internal sealed class AppleMusicClient(
         CancellationToken ct = default
     )
     {
-        ConfigureAuthHeaders(requireUserToken: true);
+        var authHeaders = GenerateAuthHeaders(requireUserToken: true);
 
         const int batchSize = 100;
 
@@ -164,7 +170,7 @@ internal sealed class AppleMusicClient(
             var json = JsonSerializer.Serialize(payload);
             var url = $"{ApiBaseUrl}/me/library/playlists/{playlistId}/tracks";
 
-            var response = await PostWithRateLimitAsync(url, json, ct);
+            var response = await PostWithRateLimitAsync(url, json, authHeaders, ct);
             if (response is null)
                 return false;
         }
@@ -172,7 +178,7 @@ internal sealed class AppleMusicClient(
         return true;
     }
 
-    private void ConfigureAuthHeaders(bool requireUserToken)
+    private Dictionary<string, string> GenerateAuthHeaders(bool requireUserToken)
     {
         if (
             string.IsNullOrWhiteSpace(_tokenCache.DeveloperToken)
@@ -180,47 +186,72 @@ internal sealed class AppleMusicClient(
         )
             throw new AppleMusicUnauthorizedException();
 
-        _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue(
-            "Bearer",
-            _tokenCache.DeveloperToken
-        );
-
-        _httpClient.DefaultRequestHeaders.Remove("Music-User-Token");
+        var headers = new Dictionary<string, string>
+        {
+            ["Authorization"] = $"Bearer {_tokenCache.DeveloperToken}",
+        };
 
         if (!requireUserToken)
-            return;
+            return headers;
 
         if (string.IsNullOrWhiteSpace(_tokenCache.UserToken) || !_tokenCache.HasValidUserToken)
             throw new InvalidOperationException(
                 "User token is required for this operation. Run '/auth' first."
             );
 
-        _httpClient.DefaultRequestHeaders.Add("Music-User-Token", _tokenCache.UserToken);
+        headers["Music-User-Token"] = _tokenCache.UserToken;
+        return headers;
     }
 
-    private Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct) =>
-        SendAsync(token => _httpClient.GetAsync(url, token), ct);
+    private Task<string?> GetWithRateLimitAsync(
+        string url,
+        Dictionary<string, string> authHeaders,
+        CancellationToken ct
+    ) =>
+        SendAsync(
+            token =>
+            {
+                var request = new HttpRequestMessage(HttpMethod.Get, url);
+                ApplyAuthHeaders(request, authHeaders);
+                return _httpClient.SendAsync(request, token);
+            },
+            ct
+        );
 
     private Task<string?> PostWithRateLimitAsync(
         string url,
         string jsonBody,
+        Dictionary<string, string> authHeaders,
         CancellationToken ct
     ) =>
         SendAsync(
             async token =>
             {
-                using var content = new StringContent(jsonBody, Encoding.UTF8, "application/json");
-                return await _httpClient.PostAsync(url, content, token);
+                var request = new HttpRequestMessage(HttpMethod.Post, url)
+                {
+                    Content = new StringContent(jsonBody, Encoding.UTF8, "application/json"),
+                };
+                ApplyAuthHeaders(request, authHeaders);
+                return await _httpClient.SendAsync(request, token);
             },
             ct
         );
+
+    private static void ApplyAuthHeaders(
+        HttpRequestMessage request,
+        Dictionary<string, string> headers
+    )
+    {
+        foreach (var (key, value) in headers)
+            request.Headers.TryAddWithoutValidation(key, value);
+    }
 
     private async Task<string?> SendAsync(
         Func<CancellationToken, Task<HttpResponseMessage>> sendAsync,
         CancellationToken ct
     )
     {
-        await EnforceRateLimitAsync(ct);
+        using var lease = await _rateLimiter.AcquireAsync(permitCount: 1, ct);
         ct.ThrowIfCancellationRequested();
 
         using var response = await sendAsync(ct);
@@ -255,23 +286,6 @@ internal sealed class AppleMusicClient(
         return null;
     }
 
-    private async Task EnforceRateLimitAsync(CancellationToken ct)
-    {
-        await _rateLimitLock.WaitAsync(ct);
-        try
-        {
-            var elapsed = (DateTimeOffset.UtcNow - _lastCallTime).TotalMilliseconds;
-            if (elapsed < _options.MinDelayBetweenCallsMs)
-                await Task.Delay(_options.MinDelayBetweenCallsMs - (int)elapsed, ct);
-
-            _lastCallTime = DateTimeOffset.UtcNow;
-        }
-        finally
-        {
-            _rateLimitLock.Release();
-        }
-    }
-
     private static AppleMusicTrack? ParseTrack(JsonElement element)
     {
         if (
@@ -294,6 +308,6 @@ internal sealed class AppleMusicClient(
 
     public void Dispose()
     {
-        _rateLimitLock.Dispose();
+        _rateLimiter.Dispose();
     }
 }

@@ -1,6 +1,6 @@
-using System.Net;
 using Ciderfy.Configuration.Options;
 using Ciderfy.Matching;
+using Ciderfy.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -29,15 +29,10 @@ internal static class MatchingExtensions
                     {
                         var options = sp.GetRequiredService<IOptions<DeezerClientOptions>>().Value;
                         client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                        client.DefaultRequestHeaders.Add(
-                            "User-Agent",
-                            "Ciderfy/1.0 (playlist transfer tool)"
-                        );
+                        HttpClientFactory.ConfigureDeezerClient(client);
                     }
                 )
-                .ConfigurePrimaryHttpMessageHandler(() =>
-                    new HttpClientHandler { AutomaticDecompression = DecompressionMethods.All }
-                );
+                .ConfigurePrimaryHttpMessageHandler(HttpClientFactory.CreateDecompressionHandler);
 
             return services;
         }

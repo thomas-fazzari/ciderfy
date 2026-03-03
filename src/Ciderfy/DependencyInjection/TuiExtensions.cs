@@ -10,7 +10,7 @@ internal static class TuiExtensions
     {
         public IServiceCollection AddTui()
         {
-            services.AddTransient<TuiApp>();
+            services.AddSingleton<TuiApp>();
             return services;
         }
     }

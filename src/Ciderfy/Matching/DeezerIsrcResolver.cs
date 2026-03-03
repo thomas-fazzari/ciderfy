@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using Ciderfy.Configuration.Options;
 using Microsoft.Extensions.Options;
 
@@ -14,10 +15,16 @@ internal sealed class DeezerIsrcResolver(
 {
     private const string SearchUrl = "https://api.deezer.com/search";
 
-    private readonly DeezerClientOptions _options = options.Value;
-    private readonly SemaphoreSlim _rateLimitLock = new(1, 1);
-
-    private DateTimeOffset _lastCallTime = DateTimeOffset.MinValue;
+    private readonly RateLimiter _rateLimiter = new SlidingWindowRateLimiter(
+        new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = 1,
+            Window = TimeSpan.FromMilliseconds(options.Value.RateLimitDelayMs),
+            SegmentsPerWindow = 1,
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = int.MaxValue,
+        }
+    );
 
     /// <summary>
     /// Resolves ISRCs for a batch of tracks using individual Deezer searches
@@ -70,7 +77,7 @@ internal sealed class DeezerIsrcResolver(
 
     private async Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct)
     {
-        await EnforceRateLimitAsync(ct);
+        using var lease = await _rateLimiter.AcquireAsync(permitCount: 1, ct);
 
         try
         {
@@ -95,27 +102,8 @@ internal sealed class DeezerIsrcResolver(
         }
     }
 
-    private async Task EnforceRateLimitAsync(CancellationToken ct)
-    {
-        await _rateLimitLock.WaitAsync(ct);
-        try
-        {
-            var elapsed = (DateTimeOffset.UtcNow - _lastCallTime).TotalMilliseconds;
-            if (elapsed < _options.RateLimitDelayMs)
-            {
-                var delay = _options.RateLimitDelayMs - (int)elapsed;
-                await Task.Delay(delay, ct);
-            }
-            _lastCallTime = DateTimeOffset.UtcNow;
-        }
-        finally
-        {
-            _rateLimitLock.Release();
-        }
-    }
-
     public void Dispose()
     {
-        _rateLimitLock.Dispose();
+        _rateLimiter.Dispose();
     }
 }

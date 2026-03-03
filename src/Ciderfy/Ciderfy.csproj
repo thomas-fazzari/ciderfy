@@ -6,10 +6,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Ciderfy.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
     <PackageReference Include="F23.StringSimilarity" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
@@ -18,5 +14,6 @@
     <PackageReference Include="Microsoft.Extensions.Options.DataAnnotations" />
     <PackageReference Include="Otp.NET" />
     <PackageReference Include="Spectre.Console" />
+    <PackageReference Include="System.Threading.RateLimiting" />
   </ItemGroup>
 </Project>
