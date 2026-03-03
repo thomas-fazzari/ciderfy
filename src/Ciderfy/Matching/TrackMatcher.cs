@@ -23,7 +23,7 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         CancellationToken ct = default
     )
     {
-        var cleanTitle = StripVersionSuffix(spotifyTrack.Title);
+        var cleanTitle = spotifyTrack.Title;
         var primaryTitle = ExtractPrimaryTitle(NormalizeForComparison(cleanTitle));
         var normalizedClean = NormalizeForComparison(cleanTitle);
 
