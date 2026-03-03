@@ -1,0 +1,56 @@
+name: Update NuGet packages
+
+on:
+  schedule:
+    - cron: "0 8 * * 1" # Every Monday, 08:00 UTC
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore && dotnet tool restore
+
+      - name: Upgrade packages
+        run: dotnet dotnet-outdated --upgrade --version-lock Minor
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "diff<<EOF" >> "$GITHUB_OUTPUT"
+            git diff Directory.Packages.props >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create pull request
+        if: steps.changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: chore/update-packages
+          commit-message: "chore: update NuGet packages"
+          title: "chore: update NuGet packages"
+          body: |
+            Automated NuGet package updates via `dotnet outdated --upgrade --version-lock Minor`.
+
+            ```diff
+            ${{ steps.changes.outputs.diff }}
+            ```
+          labels: dependencies
+          delete-branch: true
