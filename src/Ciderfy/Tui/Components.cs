@@ -38,10 +38,9 @@ internal static class Components
 
         for (var i = 0; i < normalizedLines.Length; i++)
         {
-            var color = Theme.BannerColors[i];
             var bold = i is 2 or 3 ? " bold" : "";
             var centeredLine = string.Concat(new string(' ', leftPadding), normalizedLines[i]);
-            rows.Add(new Markup($"[{color}{bold}]{Markup.Escape(centeredLine)}[/]"));
+            rows.Add(new Markup($"[{Theme.Primary}{bold}]{Markup.Escape(centeredLine)}[/]"));
         }
 
         return new Rows(rows);
