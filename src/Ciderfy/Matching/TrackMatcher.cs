@@ -47,7 +47,7 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
 
         return new MatchResult.NotFound(
             spotifyTrack,
-            $"Best match below threshold ({AcceptanceThreshold:P0})"
+            $"{MatchResult.NotFound.BelowThresholdPrefix} ({AcceptanceThreshold:P0})"
         );
     }
 
@@ -137,8 +137,8 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     /// </remarks>
     internal static string StripVersionSuffix(string s)
     {
-        s = ParenVersionRegex().Replace(s, "");
-        s = VersionSuffixRegex().Replace(s, "");
+        s = ParenVersionRegex().Replace(s, string.Empty);
+        s = VersionSuffixRegex().Replace(s, string.Empty);
         return s.Trim();
     }
 
@@ -154,13 +154,17 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         s = s.Replace('\u2013', '-').Replace('\u2014', '-');
 
         // Remove apostrophes
-        s = s.Replace("'", "").Replace("\u2019", "");
+        s = s.Replace("'", string.Empty).Replace("\u2019", string.Empty);
 
         // Remove quotes, parentheses, brackets
-        s = s.Replace("\"", "").Replace("(", "").Replace(")", "").Replace("[", "").Replace("]", "");
+        s = s.Replace("\"", string.Empty)
+            .Replace("(", string.Empty)
+            .Replace(")", string.Empty)
+            .Replace("[", string.Empty)
+            .Replace("]", string.Empty);
 
         // Remove featuring clauses
-        s = FeaturingRegex().Replace(s, "");
+        s = FeaturingRegex().Replace(s, string.Empty);
 
         // Normalize "&" to "and"
         s = s.Replace(" & ", " and ");
@@ -198,7 +202,7 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         }
 
         return bestCandidate is not null && bestScore >= AcceptanceThreshold
-            ? new MatchResult.Matched(spotifyTrack, bestCandidate, "text", bestScore)
+            ? new MatchResult.Matched(spotifyTrack, bestCandidate, MatchMethod.Text, bestScore)
             : null;
     }
 

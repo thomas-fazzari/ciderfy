@@ -55,19 +55,21 @@ public class SpotifyUrlInfoTests
     }
 
     [Fact]
-    public void Parse_ValidUrl_ReturnsInfo()
+    public void TryParse_ValidUri_ReturnsInfo()
     {
-        var result = SpotifyUrlInfo.Parse("spotify:playlist:abc123");
+        var success = SpotifyUrlInfo.TryParse("spotify:playlist:abc123", out var result);
 
+        Assert.True(success);
         Assert.NotNull(result);
         Assert.Equal("abc123", result.Id);
     }
 
     [Fact]
-    public void Parse_InvalidUrl_ReturnsNull()
+    public void TryParse_InvalidString_ReturnsFalse()
     {
-        var result = SpotifyUrlInfo.Parse("not-valid");
+        var success = SpotifyUrlInfo.TryParse("not-valid", out var result);
 
+        Assert.False(success);
         Assert.Null(result);
     }
 }

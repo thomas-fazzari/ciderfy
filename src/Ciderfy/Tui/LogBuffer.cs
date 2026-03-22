@@ -9,6 +9,7 @@ internal enum LogKind
     Success,
     Warning,
     Error,
+    Separator,
 }
 
 /// <summary>
@@ -39,6 +40,12 @@ internal sealed class LogBuffer(int capacity = 500)
             _head = (_head + 1) % capacity;
     }
 
+    internal void Clear()
+    {
+        _head = 0;
+        _count = 0;
+    }
+
     /// <summary>
     /// Returns the most recent entries that fit within the given height
     /// </summary>
@@ -56,6 +63,4 @@ internal sealed class LogBuffer(int capacity = 500)
 
         return buffer;
     }
-
-    internal bool IsEmpty => _count == 0;
 }

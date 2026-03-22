@@ -16,6 +16,10 @@ internal static class HttpClientFactory
 
     internal const string DeezerUserAgent = "Ciderfy/1.0 (playlist transfer tool)";
 
+    internal const string SpotifyUserAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
     internal static void ConfigureAppleMusicAuthClient(HttpClient client)
     {
         client.DefaultRequestHeaders.Add("User-Agent", AppleMusicAuthUserAgent);
@@ -30,6 +34,11 @@ internal static class HttpClientFactory
     internal static void ConfigureDeezerClient(HttpClient client)
     {
         client.DefaultRequestHeaders.Add("User-Agent", DeezerUserAgent);
+    }
+
+    internal static void ConfigureSpotifyClient(HttpClient client)
+    {
+        client.DefaultRequestHeaders.Add("User-Agent", SpotifyUserAgent);
     }
 
     internal static HttpClientHandler CreateDecompressionHandler() =>

@@ -36,14 +36,14 @@ internal sealed partial class TuiApp(
     private int _spinnerTick;
     private int _progressCurrent;
     private int _progressTotal;
-    private string _progressLabel = "";
+    private string _progressLabel = string.Empty;
 
     // Transfer data
     private List<TrackMetadata>? _transferTracks;
     private List<MatchResult.Matched>? _isrcResults;
     private List<TrackMetadata>? _unmatchedTracks;
     private List<MatchResult>? _textResults;
-    private string _playlistName = "";
+    private string _playlistName = string.Empty;
 
     // Results scroll
     private List<MatchResult>? _allResults;
@@ -265,13 +265,13 @@ internal sealed partial class TuiApp(
         _phase = TuiTransferPhase.Idle;
         _progressCurrent = 0;
         _progressTotal = 0;
-        _progressLabel = "";
+        _progressLabel = string.Empty;
         _transferTracks = null;
         _isrcResults = null;
         _unmatchedTracks = null;
         _textResults = null;
         _allResults = null;
-        _playlistName = "";
+        _playlistName = string.Empty;
         _scrollOffset = 0;
     }
 

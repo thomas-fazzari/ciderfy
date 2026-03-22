@@ -12,7 +12,6 @@ internal static class Theme
     internal const string White = "#c0caf5";
     internal const string Muted = "#a9b1d6";
     internal const string Red = "#f7768e";
-    internal const string Magenta = "#bb9af7";
     internal const string Cyan = "#89ddff";
     internal const string Teal = "#7dcfff";
 
@@ -30,6 +29,17 @@ internal static class Theme
     internal static readonly Color GrayColor = Color.FromHex(Gray);
     internal static readonly Color PrimaryColor = Color.FromHex(Primary);
     internal static readonly Color RedColor = Color.FromHex(Red);
+
+    internal const char SeparatorChar = '\u2500';
+    internal const int SeparatorMaxWidth = 40;
+
+    internal const char ProgressFilled = '\u2588';
+    internal const char ProgressEmpty = '\u2591';
+    internal const string CursorBlock = "\u2588";
+    internal const string Ellipsis = "\u2026";
+    internal const string ArrowUp = "\u2191";
+    internal const string ArrowDown = "\u2193";
+    internal const string Bullet = "\u2022";
 
     internal static readonly string[] SpinnerFrames =
     [

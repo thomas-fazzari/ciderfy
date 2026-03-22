@@ -6,7 +6,7 @@ namespace Ciderfy.Tui;
 
 internal sealed partial class TuiApp
 {
-    // Lines consumed by fixed UI elements (everything except the content area).
+    // Border(2) + Banner(6) + Separator(1) + Badges(1) + Gap(1) + [Input panel(4)] + Footer(1)
     private int CurrentFixedChromeHeight => 2 + 6 + 1 + 1 + 1 + (ShowInput ? 4 : 0) + 1;
     private bool ShowInput =>
         _awaitingUserToken || _phase is TuiTransferPhase.Idle or TuiTransferPhase.Done;
@@ -53,20 +53,15 @@ internal sealed partial class TuiApp
 
         if (ShowInput)
         {
-            IRenderable input;
-            if (_awaitingUserToken)
-                input = Components.RenderInputWithPrompt(
-                    "token>",
+            var input = _awaitingUserToken
+                ? Components.RenderInput(
                     _inputBuffer.ToString(),
                     _cursorVisible,
-                    contentWidth
-                );
-            else
-                input = Components.RenderInput(
-                    _inputBuffer.ToString(),
-                    _cursorVisible,
-                    contentWidth
-                );
+                    contentWidth,
+                    prompt: "token>",
+                    placeholder: null
+                )
+                : Components.RenderInput(_inputBuffer.ToString(), _cursorVisible, contentWidth);
 
             rowsList.Add(new Text(""));
             rowsList.Add(input);

@@ -38,7 +38,7 @@ internal static class Components
 
         for (var i = 0; i < normalizedLines.Length; i++)
         {
-            var bold = i is 2 or 3 ? " bold" : "";
+            var bold = i is 2 or 3 ? " bold" : string.Empty;
             var centeredLine = string.Concat(new string(' ', leftPadding), normalizedLines[i]);
             rows.Add(new Markup($"[{Theme.Primary}{bold}]{Markup.Escape(centeredLine)}[/]"));
         }
@@ -83,6 +83,16 @@ internal static class Components
 
         foreach (var entry in visible)
         {
+            if (entry.Kind is LogKind.Separator)
+            {
+                var rule = new string(
+                    Theme.SeparatorChar,
+                    Math.Min(width, Theme.SeparatorMaxWidth)
+                );
+                lines.Add($"[{Theme.Gray}]{rule}[/]");
+                continue;
+            }
+
             var escaped = Markup.Escape(Truncate(entry.Message, width - Theme.LogPrefixWidth));
             var (prefix, color) = entry.Kind switch
             {
@@ -98,7 +108,7 @@ internal static class Components
             lines.Add($"[{Theme.Muted}]No activity yet[/]");
 
         while (lines.Count < height)
-            lines.Add("");
+            lines.Add(string.Empty);
 
         return new Markup(string.Join('\n', lines));
     }
@@ -109,7 +119,7 @@ internal static class Components
         var filled = (int)(barWidth * Math.Clamp(percent, 0, 1));
         var empty = barWidth - filled;
 
-        var bar = new string('\u2588', filled) + new string('\u2591', empty);
+        var bar = new string(Theme.ProgressFilled, filled) + new string(Theme.ProgressEmpty, empty);
         var pctText = $" {(int)(percent * 100)}%";
 
         return new Markup(
@@ -131,34 +141,20 @@ internal static class Components
                 + $"Try text matching for {count} remaining track(s)? (can be slow) [[Y/n]] [/]"
         );
 
-    internal static IRenderable RenderInput(string buffer, bool showCursor, int width)
-    {
-        var prompt = $"[{Theme.Teal} bold]> [/]";
-        var text = string.IsNullOrEmpty(buffer)
-            ? $"[{Theme.Muted}]Paste Spotify playlist URL or type /help[/]"
-            : $"[{Theme.White}]{Markup.Escape(buffer)}[/]";
-
-        var cursor = showCursor ? $"[{Theme.Teal}]\u2588[/]" : "";
-
-        return new Panel(new Markup(prompt + text + cursor))
-        {
-            Border = BoxBorder.Rounded,
-            BorderStyle = new Style(Theme.GrayColor),
-            Padding = new Padding(1, 0),
-            Width = width,
-        };
-    }
-
-    internal static IRenderable RenderInputWithPrompt(
-        string prompt,
+    internal static IRenderable RenderInput(
         string buffer,
         bool showCursor,
-        int width
+        int width,
+        string prompt = ">",
+        string? placeholder = "Paste a Spotify playlist URL or run /help"
     )
     {
         var promptMarkup = $"[{Theme.Teal} bold]{Markup.Escape(prompt)} [/]";
-        var text = $"[{Theme.White}]{Markup.Escape(buffer)}[/]";
-        var cursor = showCursor ? $"[{Theme.Teal}]\u2588[/]" : "";
+        var text =
+            string.IsNullOrEmpty(buffer) && placeholder is not null
+                ? $"[{Theme.Muted}]{Markup.Escape(placeholder)}[/]"
+                : $"[{Theme.White}]{Markup.Escape(buffer)}[/]";
+        var cursor = showCursor ? $"[{Theme.Teal}]{Theme.CursorBlock}[/]" : string.Empty;
 
         return new Panel(new Markup(promptMarkup + text + cursor))
         {
@@ -202,7 +198,7 @@ internal static class Components
             switch (r)
             {
                 case MatchResult.Matched m:
-                    var detail = m.Method == "ISRC" ? "ISRC" : $"Text {m.Confidence:F2}";
+                    var detail = m.Method is MatchMethod.Isrc ? "ISRC" : $"Text {m.Confidence:F2}";
                     table.AddRow(
                         $"{i + 1}",
                         trackLabel,
@@ -211,10 +207,10 @@ internal static class Components
                     break;
                 case MatchResult.NotFound nf:
                     var reason = nf.Reason.StartsWith(
-                        "Best match below threshold",
+                        MatchResult.NotFound.BelowThresholdPrefix,
                         StringComparison.OrdinalIgnoreCase
                     )
-                        ? $"Below threshold{nf.Reason["Best match below threshold".Length..]}"
+                        ? $"Below threshold{nf.Reason[MatchResult.NotFound.BelowThresholdPrefix.Length..]}"
                         : nf.Reason;
                     table.AddRow(
                         $"{i + 1}",
@@ -238,7 +234,7 @@ internal static class Components
         var success = matched > 0;
         var content =
             $"[{Theme.Primary}]{matched}[/][{Theme.Muted}]/{total} tracks transferred[/]"
-            + (notFound > 0 ? $"  [{Theme.Red}]{notFound} not found[/]" : "");
+            + (notFound > 0 ? $"  [{Theme.Red}]{notFound} not found[/]" : string.Empty);
 
         var header = success ? $" {Markup.Escape(Truncate(name, 48))} " : " Transfer failed ";
         var borderColor = success ? Theme.PrimaryColor : Theme.RedColor;
@@ -279,7 +275,7 @@ internal static class Components
         table.AddRow($"[{Theme.Primary}]/run[/]", "Start transferring the queued playlists");
         table.AddRow($"[{Theme.Primary}]/help[/]", "Show this help");
         table.AddRow($"[{Theme.Primary}]/quit[/]", "Exit");
-        table.AddRow("", "");
+        table.AddRow(string.Empty, string.Empty);
         table.AddRow(
             $"[{Theme.Primary}]<spotify-url>[/]",
             "Paste a Spotify playlist URL to transfer directly"
@@ -309,9 +305,9 @@ internal static class Components
         var posInfo =
             total > visible
                 ? $"  [{Theme.Muted}]({offset + 1}-{Math.Min(offset + visible, total)}/{total})[/]"
-                : "";
+                : string.Empty;
         return new Markup(
-            $"[{Theme.Muted}]\u2191/\u2193 scroll[/]{posInfo}[{Theme.Muted}]  \u2022  Press Enter to start a new transfer[/]"
+            $"[{Theme.Muted}]{Theme.ArrowUp}/{Theme.ArrowDown} scroll[/]{posInfo}[{Theme.Muted}]  {Theme.Bullet}  Press Enter to start a new transfer[/]"
         );
     }
 
@@ -357,5 +353,5 @@ internal static class Components
     }
 
     internal static string Truncate(string s, int max) =>
-        s.Length <= max ? s : string.Concat(s.AsSpan(0, max - 1), "\u2026");
+        s.Length <= max ? s : string.Concat(s.AsSpan(0, max - 1), Theme.Ellipsis);
 }

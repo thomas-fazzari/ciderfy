@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Ciderfy.Spotify;
 
 /// <summary>
@@ -13,7 +15,7 @@ internal record SpotifyUrlInfo(string Id)
     private const string EmbedSegment = "embed";
     private const string IntlPrefix = "intl-";
 
-    public static bool TryParse(string? url, out SpotifyUrlInfo? result)
+    public static bool TryParse(string? url, [NotNullWhen(true)] out SpotifyUrlInfo? result)
     {
         result = null;
 
@@ -26,9 +28,6 @@ internal record SpotifyUrlInfo(string Id)
 
         return result is not null;
     }
-
-    public static SpotifyUrlInfo? Parse(string? url) =>
-        TryParse(url, out var result) ? result : null;
 
     private static SpotifyUrlInfo? ParseSpotifyUri(string uri)
     {

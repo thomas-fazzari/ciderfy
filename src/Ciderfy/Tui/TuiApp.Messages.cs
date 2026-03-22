@@ -88,7 +88,8 @@ internal sealed partial class TuiApp
         _transferTracks = PlaylistMerger.MergeTracks(playlists);
         _playlistName = PlaylistMerger.ResolveName(playlists, _nextPlaylistName);
 
-        var mergeInfo = playlists.Count > 1 ? $"Merged {playlists.Count} playlists - " : "";
+        var mergeInfo =
+            playlists.Count > 1 ? $"Merged {playlists.Count} playlists - " : string.Empty;
 
         _logs.Append(
             LogKind.Success,
@@ -118,6 +119,8 @@ internal sealed partial class TuiApp
         if (msg.Unmatched.Count > 0)
             _logs.Append(LogKind.Info, $"{msg.Unmatched.Count} remaining");
 
+        _logs.Append(LogKind.Separator, string.Empty);
+
         if (msg.Unmatched.Count > 0)
         {
             _phase = TuiTransferPhase.ConfirmTextMatch;
@@ -145,6 +148,7 @@ internal sealed partial class TuiApp
             LogKind.Success,
             $"{textMatched}/{_unmatchedTracks?.Count ?? 0} matched via text"
         );
+        _logs.Append(LogKind.Separator, string.Empty);
 
         _phase = TuiTransferPhase.CreatingPlaylist;
         _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token));
@@ -159,10 +163,17 @@ internal sealed partial class TuiApp
             return;
         }
 
-        if (msg.Result is not { Success: true } || string.IsNullOrWhiteSpace(msg.Result.PlaylistId))
+        if (msg.Result is not { Success: true, PlaylistId: not null and not "" })
         {
             _phase = TuiTransferPhase.Idle;
-            _logs.Append(LogKind.Error, "Playlist creation failed.");
+            var reason = msg.Result switch
+            {
+                null => "No response from Apple Music",
+                { PlaylistId: null or "" } => "Apple Music did not return a playlist ID",
+                { Success: false } => "Failed to add tracks to playlist",
+                _ => "Unknown error",
+            };
+            _logs.Append(LogKind.Error, $"Playlist creation failed: {reason}");
             return;
         }
 
@@ -180,7 +191,7 @@ internal sealed partial class TuiApp
             case AppleMusicRateLimitException rl:
                 var details = rl.RetryAfterSeconds is { } retryAfter
                     ? $" Retry after about {retryAfter}s."
-                    : "";
+                    : string.Empty;
                 _logs.Append(
                     LogKind.Error,
                     $"Apple Music rate limited (429). Transfer stopped.{details}"
@@ -188,8 +199,11 @@ internal sealed partial class TuiApp
                 break;
 
             case AppleMusicUnauthorizedException:
-                tokenCache.ClearDeveloperToken();
-                _logs.Append(LogKind.Error, "Developer token expired. Run /auth to refresh it.");
+                tokenCache.Clear();
+                _logs.Append(
+                    LogKind.Error,
+                    "Authentication expired. Run /auth to re-authenticate."
+                );
                 _logs.Append(LogKind.Info, StatusSummary());
                 break;
 

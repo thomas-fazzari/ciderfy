@@ -120,8 +120,7 @@ internal sealed partial class TuiApp
         _scrollOffset = Math.Min(Math.Max(0, _allResults.Count - visibleRows), _scrollOffset + 1);
     }
 
-    private bool CanAcceptGeneralInput() =>
-        _phase is TuiTransferPhase.Idle or TuiTransferPhase.Done;
+    private bool CanAcceptGeneralInput() => _phase is TuiTransferPhase.Idle;
 
     private void HandleGeneralInput(ConsoleKeyInfo key)
     {
@@ -162,7 +161,7 @@ internal sealed partial class TuiApp
                 _phase = TuiTransferPhase.TextMatching;
                 _progressCurrent = 0;
                 _progressTotal = _unmatchedTracks?.Count ?? 0;
-                _progressLabel = "";
+                _progressLabel = string.Empty;
                 _logs.Append(LogKind.Info, "Starting text matching...");
                 _ = Task.Run(() => RunTextMatchAsync(_cts.Token));
                 break;
@@ -183,12 +182,6 @@ internal sealed partial class TuiApp
 
     private void HandleEnter()
     {
-        if (_phase is TuiTransferPhase.Done)
-        {
-            ResetTransferState();
-            return;
-        }
-
         _showHelp = false;
 
         var raw = _inputBuffer.ToString().Trim();
@@ -209,7 +202,7 @@ internal sealed partial class TuiApp
             return;
         }
 
-        if (SpotifyUrlInfo.TryParse(raw, out var urlInfo) && urlInfo is not null)
+        if (SpotifyUrlInfo.TryParse(raw, out var urlInfo))
         {
             if (_queuedPlaylistUrls.Count > 0)
             {
@@ -223,6 +216,7 @@ internal sealed partial class TuiApp
 
             ResetTransferState();
             _phase = TuiTransferPhase.FetchingPlaylist;
+            _logs.Clear();
             _logs.Append(LogKind.Info, "Starting transfer...");
             _ = Task.Run(() => RunFetchPlaylistAsync([urlInfo.Id], _cts.Token));
             return;
@@ -317,6 +311,8 @@ internal sealed partial class TuiApp
 
     private void HandleAuthCommand(string? argument)
     {
+        _logs.Clear();
+
         if ("reset".Equals(argument, StringComparison.OrdinalIgnoreCase))
         {
             tokenCache.Clear();
@@ -343,7 +339,7 @@ internal sealed partial class TuiApp
 
         foreach (var url in urls)
         {
-            if (SpotifyUrlInfo.TryParse(url, out var urlInfo) && urlInfo is not null)
+            if (SpotifyUrlInfo.TryParse(url, out var urlInfo))
             {
                 if (!_queuedPlaylistUrls.Contains(urlInfo.Id))
                 {
@@ -380,6 +376,7 @@ internal sealed partial class TuiApp
 
         ResetTransferState();
         _phase = TuiTransferPhase.FetchingPlaylist;
+        _logs.Clear();
         _logs.Append(
             LogKind.Info,
             $"Starting transfer of {playlistIdsToFetch.Count} merged playlists..."

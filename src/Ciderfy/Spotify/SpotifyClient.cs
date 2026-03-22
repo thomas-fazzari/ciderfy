@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Ciderfy.Matching;
+using Ciderfy.Web;
 using OtpNet;
 
 namespace Ciderfy.Spotify;
@@ -16,8 +17,7 @@ namespace Ciderfy.Spotify;
 /// </remarks>
 internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContainer cookies)
 {
-    private const string UserAgent =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    private const string UserAgent = HttpClientFactory.SpotifyUserAgent;
 
     private const string GraphQlEndpoint = "https://api-partner.spotify.com/pathfinder/v2/query";
     private const string ClientTokenEndpoint = "https://clienttoken.spotify.com/v1/clienttoken";
@@ -290,12 +290,12 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             return name;
         if (TryGetArtistName(element, "firstArtist", out name))
             return name;
-        return "";
+        return string.Empty;
     }
 
     private static bool TryGetArtistName(JsonElement element, string propertyName, out string name)
     {
-        name = "";
+        name = string.Empty;
         if (
             !element.TryGetProperty(propertyName, out var artists)
             || !artists.TryGetProperty("items", out var items)
@@ -308,7 +308,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             && profile.TryGetProperty("name", out var n)
         )
         {
-            name = n.GetString() ?? "";
+            name = n.GetString() ?? string.Empty;
             return name.Length > 0;
         }
 
@@ -317,8 +317,8 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
 
     private static string ExtractIdFromUri(JsonElement element) =>
         element.TryGetProperty("uri", out var uri)
-            ? uri.GetString()?.Split(':').LastOrDefault() ?? ""
-            : "";
+            ? uri.GetString()?.Split(':').LastOrDefault() ?? string.Empty
+            : string.Empty;
 
     private static int ExtractDuration(JsonElement element)
     {

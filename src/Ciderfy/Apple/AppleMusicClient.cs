@@ -263,7 +263,15 @@ internal sealed class AppleMusicClient(
             throw new AppleMusicUnauthorizedException();
 
         if (!response.IsSuccessStatusCode)
-            return null;
+        {
+            var body = await response.Content.ReadAsStringAsync(ct);
+            throw new HttpRequestException(
+                $"Apple Music API returned {(int)response.StatusCode} {response.StatusCode}"
+                    + (string.IsNullOrWhiteSpace(body) ? string.Empty : $": {body}"),
+                inner: null,
+                response.StatusCode
+            );
+        }
 
         return await response.Content.ReadAsStringAsync(ct);
     }
@@ -296,11 +304,13 @@ internal sealed class AppleMusicClient(
 
         return new AppleMusicTrack
         {
-            Id = id.GetString() ?? "",
-            Title = attrs.TryGetProperty("name", out var name) ? name.GetString() ?? "" : "",
+            Id = id.GetString() ?? string.Empty,
+            Title = attrs.TryGetProperty("name", out var name)
+                ? name.GetString() ?? string.Empty
+                : string.Empty,
             Artist = attrs.TryGetProperty("artistName", out var artist)
-                ? artist.GetString() ?? ""
-                : "",
+                ? artist.GetString() ?? string.Empty
+                : string.Empty,
             DurationMs = attrs.TryGetProperty("durationInMillis", out var dur) ? dur.GetInt32() : 0,
             Isrc = attrs.TryGetProperty("isrc", out var isrc) ? isrc.GetString() : null,
         };

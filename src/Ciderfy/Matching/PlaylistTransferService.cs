@@ -69,7 +69,7 @@ internal sealed class PlaylistTransferService(
         foreach (var track in withIsrc)
         {
             if (isrcMap.TryGetValue(track.Isrc!, out var appleTrack))
-                matched.Add(new MatchResult.Matched(track, appleTrack, "ISRC", 1.0));
+                matched.Add(new MatchResult.Matched(track, appleTrack, MatchMethod.Isrc, 1.0));
             else
                 unmatched.Add(track);
         }
