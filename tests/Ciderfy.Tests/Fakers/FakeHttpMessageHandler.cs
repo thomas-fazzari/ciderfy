@@ -50,4 +50,13 @@ internal sealed class FakeHttpMessageHandler(Func<HttpRequestMessage, HttpRespon
                 throw new InvalidOperationException("HTTP should not be called in this test")
             )
         );
+
+    // Simulates a network-level failure
+    internal static HttpClient ThrowingHttpRequestException(string message = "network error") =>
+        new(new FakeHttpMessageHandler(_ => throw new HttpRequestException(message)));
+
+    // Simulates a TaskCanceledException from HttpClient timeout
+    // (not triggered by the caller's CancellationToken)
+    internal static HttpClient ThrowingTimeoutCanceledException() =>
+        new(new FakeHttpMessageHandler(_ => throw new TaskCanceledException("timeout")));
 }

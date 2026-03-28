@@ -62,6 +62,9 @@ public class TrackMatcherTests
     [InlineData("Paint It Black", "Paint It, Black", 1.0)]
     [InlineData("Revolution 909", "Revolution 909", 1.0)]
     [InlineData("Hey Jude", "Let It Be", -1.0)] // different songs -> below 0.7
+    [InlineData("Song A / Extended Mix", "Song A / Radio Mix", 0.95)] // slash: same primary segment
+    [InlineData("Song A - Studio Mix", "Song A - Radio Mix", 0.95)] // dash: same primary segment
+    [InlineData("Song Title Extended / B-Side", "Song Title / A-Side", 0.85)] // primary contains other
     public void TitleSimilarity_ReturnsExpectedScore(string a, string b, double expected)
     {
         var result = TrackMatcher.TitleSimilarity(a, b);
