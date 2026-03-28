@@ -20,25 +20,27 @@ internal static class HttpClientFactory
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
         + "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+    internal const string AppleMusicUrl = "https://music.apple.com";
+
     internal static void ConfigureAppleMusicAuthClient(HttpClient client)
     {
-        client.DefaultRequestHeaders.Add("User-Agent", AppleMusicAuthUserAgent);
+        client.DefaultRequestHeaders.Add(HttpHeaderNames.UserAgent, AppleMusicAuthUserAgent);
     }
 
     internal static void ConfigureAppleMusicClient(HttpClient client)
     {
-        client.DefaultRequestHeaders.Add("User-Agent", AppleMusicClientUserAgent);
-        client.DefaultRequestHeaders.Add("Origin", "https://music.apple.com");
+        client.DefaultRequestHeaders.Add(HttpHeaderNames.UserAgent, AppleMusicClientUserAgent);
+        client.DefaultRequestHeaders.Add(HttpHeaderNames.Origin, AppleMusicUrl);
     }
 
     internal static void ConfigureDeezerClient(HttpClient client)
     {
-        client.DefaultRequestHeaders.Add("User-Agent", DeezerUserAgent);
+        client.DefaultRequestHeaders.Add(HttpHeaderNames.UserAgent, DeezerUserAgent);
     }
 
     internal static void ConfigureSpotifyClient(HttpClient client)
     {
-        client.DefaultRequestHeaders.Add("User-Agent", SpotifyUserAgent);
+        client.DefaultRequestHeaders.Add(HttpHeaderNames.UserAgent, SpotifyUserAgent);
     }
 
     internal static HttpClientHandler CreateDecompressionHandler() =>
