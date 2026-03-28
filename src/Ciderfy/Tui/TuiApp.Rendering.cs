@@ -87,6 +87,11 @@ internal sealed partial class TuiApp
                 1,
                 Components.RenderSpinnerLine("Fetching Spotify playlist...", _spinnerTick)
             ),
+            TuiTransferPhase.ResolvingIsrc
+                when _progressTotal > 0 && _progressCurrent >= _progressTotal => (
+                1,
+                Components.RenderSpinnerLine("Matching against Apple Music...", _spinnerTick)
+            ),
             TuiTransferPhase.ResolvingIsrc => (
                 2,
                 Components.RenderProgressBar(
