@@ -90,4 +90,43 @@ public class TokenCacheTests
         };
         Assert.True(cache.HasValidUserToken);
     }
+
+    [Fact]
+    public void Clear_resets_all_properties()
+    {
+        var cache = new TokenCache
+        {
+            DeveloperToken = "dev",
+            DeveloperTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
+            UserToken = "user",
+            UserTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
+        };
+
+        cache.Clear();
+
+        Assert.Null(cache.DeveloperToken);
+        Assert.Null(cache.DeveloperTokenExpiry);
+        Assert.Null(cache.UserToken);
+        Assert.Null(cache.UserTokenExpiry);
+    }
+
+    [Fact]
+    public void ClearDeveloperToken_clears_developer_token_preserves_user_token()
+    {
+        var expiry = DateTimeOffset.UtcNow.AddHours(1);
+        var cache = new TokenCache
+        {
+            DeveloperToken = "dev",
+            DeveloperTokenExpiry = expiry,
+            UserToken = "user",
+            UserTokenExpiry = expiry,
+        };
+
+        cache.ClearDeveloperToken();
+
+        Assert.Null(cache.DeveloperToken);
+        Assert.Null(cache.DeveloperTokenExpiry);
+        Assert.Equal("user", cache.UserToken);
+        Assert.Equal(expiry, cache.UserTokenExpiry);
+    }
 }
