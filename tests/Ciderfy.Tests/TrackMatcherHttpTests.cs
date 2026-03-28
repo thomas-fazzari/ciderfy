@@ -25,7 +25,7 @@ public class TrackMatcherHttpTests
         new(new AppleMusicClient(http, _fastOptions, _tokenCache));
 
     [Fact]
-    public async Task MatchTrackByTextAsync_returns_Matched_when_candidate_found()
+    public async Task MatchTrackByTextAsync_ReturnsMatched_WhenCandidateFound()
     {
         var searchJson = """
             {
@@ -59,7 +59,7 @@ public class TrackMatcherHttpTests
     }
 
     [Fact]
-    public async Task MatchTrackByTextAsync_returns_NotFound_when_no_candidates_match()
+    public async Task MatchTrackByTextAsync_ReturnsNotFound_WhenNoCandidatesMatch()
     {
         var emptyJson = """{"results":{"songs":{"data":[]}}}""";
 

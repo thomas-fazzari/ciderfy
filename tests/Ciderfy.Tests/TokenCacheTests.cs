@@ -92,7 +92,7 @@ public class TokenCacheTests
     }
 
     [Fact]
-    public void Clear_resets_all_properties()
+    public void Clear_ResetsAllProperties()
     {
         var cache = new TokenCache
         {
@@ -111,7 +111,7 @@ public class TokenCacheTests
     }
 
     [Fact]
-    public void ClearDeveloperToken_clears_developer_token_preserves_user_token()
+    public void ClearDeveloperToken_ClearsDeveloperToken_PreservesUserToken()
     {
         var expiry = DateTimeOffset.UtcNow.AddHours(1);
         var cache = new TokenCache
