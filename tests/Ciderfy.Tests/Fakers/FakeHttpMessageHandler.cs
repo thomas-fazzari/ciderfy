@@ -1,4 +1,5 @@
 using System.Net;
+using Ciderfy.Web;
 
 namespace Ciderfy.Tests.Fakers;
 
@@ -25,7 +26,7 @@ internal sealed class FakeHttpMessageHandler(Func<HttpRequestMessage, HttpRespon
         new(
             new FakeHttpMessageHandler(_ => new HttpResponseMessage(status)
             {
-                Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json"),
+                Content = new StringContent(json, System.Text.Encoding.UTF8, MimeTypes.Json),
             })
         );
 

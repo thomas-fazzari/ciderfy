@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using Ciderfy.Configuration.Options;
+using Ciderfy.Web;
 using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Apple;
@@ -27,7 +28,6 @@ internal sealed class AppleMusicClient(
 ) : IDisposable
 {
     private const string ApiBaseUrl = "https://api.music.apple.com/v1";
-    private const string AuthorizationHeader = "Authorization";
     private const string MusicUserTokenHeader = "Music-User-Token";
 
     private readonly HttpClient _httpClient = httpClient;
@@ -184,7 +184,7 @@ internal sealed class AppleMusicClient(
 
         var headers = new Dictionary<string, string>
         {
-            [AuthorizationHeader] = $"Bearer {_tokenCache.DeveloperToken}",
+            [HttpHeaderNames.Authorization] = $"Bearer {_tokenCache.DeveloperToken}",
         };
 
         if (!requireUserToken)
@@ -225,7 +225,7 @@ internal sealed class AppleMusicClient(
             {
                 var request = new HttpRequestMessage(HttpMethod.Post, url)
                 {
-                    Content = new StringContent(jsonBody, Encoding.UTF8, "application/json"),
+                    Content = new StringContent(jsonBody, Encoding.UTF8, MimeTypes.Json),
                 };
                 ApplyAuthHeaders(request, authHeaders);
                 return await _httpClient.SendAsync(request, token);
