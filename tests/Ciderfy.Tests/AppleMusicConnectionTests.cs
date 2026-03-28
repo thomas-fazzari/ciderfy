@@ -8,14 +8,7 @@ namespace Ciderfy.Tests;
 [IntegrationTest]
 public class AppleMusicConnectionTests
 {
-    private readonly TokenCache _tokenCache;
-
-    public AppleMusicConnectionTests()
-    {
-        _tokenCache = TokenCache.Load();
-        if (!_tokenCache.HasValidDeveloperToken)
-            Assert.Skip("Ignored: no token available in cache");
-    }
+    private readonly TokenCache _tokenCache = TokenCache.Load();
 
     [Fact]
     public async Task ExtractDeveloperToken_ReturnsValidJwt()
