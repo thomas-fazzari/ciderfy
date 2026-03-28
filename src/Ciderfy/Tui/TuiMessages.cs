@@ -56,8 +56,11 @@ internal sealed record TextDoneMsg(List<MatchResult>? Results, Exception? Error)
 /// <summary>
 /// Signals that Apple Music playlist creation completed or failed
 /// </summary>
-internal sealed record PlaylistCreatedMsg(PlaylistCreateResult? Result, Exception? Error)
-    : TuiMessage;
+internal sealed record PlaylistCreatedMsg(
+    PlaylistCreateResult? Result,
+    List<MatchResult>? AllResults,
+    Exception? Error
+) : TuiMessage;
 
 /// <summary>
 /// Signals that Apple Music authentication completed or failed

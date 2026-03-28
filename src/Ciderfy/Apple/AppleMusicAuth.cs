@@ -83,13 +83,12 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
                     }
                 }
             }
-            catch (HttpRequestException)
+            catch (Exception e)
+                when (e is HttpRequestException
+                    || (e is TaskCanceledException && !ct.IsCancellationRequested)
+                )
             {
-                // Skip failed bundles and try next
-            }
-            catch (TaskCanceledException) when (!ct.IsCancellationRequested)
-            {
-                // Skip timed out bundles and try next
+                // Skip failed or timed-out bundles and try next
             }
         }
 
@@ -134,15 +133,7 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
             var expiry = DateTimeOffset.FromUnixTimeSeconds(exp.GetInt64());
             return expiry > DateTimeOffset.UtcNow.AddMinutes(5);
         }
-        catch (FormatException)
-        {
-            return false;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-        catch (JsonException)
+        catch (Exception e) when (e is FormatException or ArgumentException or JsonException)
         {
             return false;
         }
@@ -164,15 +155,7 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
 
             return null;
         }
-        catch (FormatException)
-        {
-            return null;
-        }
-        catch (ArgumentException)
-        {
-            return null;
-        }
-        catch (JsonException)
+        catch (Exception e) when (e is FormatException or ArgumentException or JsonException)
         {
             return null;
         }

@@ -179,7 +179,7 @@ internal sealed partial class TuiApp
 
         _logs.Append(LogKind.Success, $"Playlist created: {msg.Result.PlaylistId}");
         _nextPlaylistName = null;
-        _allResults = BuildAllResults();
+        _allResults = msg.AllResults;
         _scrollOffset = 0;
         _phase = TuiTransferPhase.Done;
     }

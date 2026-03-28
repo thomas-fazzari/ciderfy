@@ -249,8 +249,6 @@ internal sealed partial class TuiApp
         var cmd = parts[0];
         var arg = parts.Length > 1 ? parts[1].Trim() : null;
 
-        EnsureCommandsRegistered();
-
         if (_commands.TryExecute(cmd, arg))
             return;
 
@@ -259,9 +257,6 @@ internal sealed partial class TuiApp
 
     private void EnsureCommandsRegistered()
     {
-        if (_commandsRegistered)
-            return;
-
         _commands.Register(HandleQuitCommand, "/quit", "/exit", "/q");
         _commands.Register(HandleHelpCommand, "/help", "/h");
         _commands.Register(HandleStatusCommand, "/status");
@@ -270,8 +265,6 @@ internal sealed partial class TuiApp
         _commands.Register(HandleAuthCommand, "/auth");
         _commands.Register(HandleAddCommand, "/add");
         _commands.Register(HandleRunCommand, "/run");
-
-        _commandsRegistered = true;
     }
 
     private void HandleQuitCommand(string? _)

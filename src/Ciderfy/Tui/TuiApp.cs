@@ -20,7 +20,6 @@ internal sealed partial class TuiApp(
     private readonly LogBuffer _logs = new();
     private readonly StringBuilder _inputBuffer = new();
     private readonly TuiCommandRegistry _commands = new();
-    private bool _commandsRegistered;
 
     private TuiTransferPhase _phase = TuiTransferPhase.Idle;
     private string _storefront = "us";
@@ -250,11 +249,11 @@ internal sealed partial class TuiApp(
         {
             var allResults = BuildAllResults();
             var result = await transferService.CreatePlaylistAsync(_playlistName, allResults, ct);
-            _channel.Writer.TryWrite(new PlaylistCreatedMsg(result, null));
+            _channel.Writer.TryWrite(new PlaylistCreatedMsg(result, allResults, null));
         }
         catch (Exception ex)
         {
-            _channel.Writer.TryWrite(new PlaylistCreatedMsg(null, ex));
+            _channel.Writer.TryWrite(new PlaylistCreatedMsg(null, null, ex));
         }
     }
 

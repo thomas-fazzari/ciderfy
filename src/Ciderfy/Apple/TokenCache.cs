@@ -41,15 +41,7 @@ internal sealed class TokenCache
             return JsonSerializer.Deserialize(json, TokenCacheJsonContext.Default.TokenCache)
                 ?? new TokenCache();
         }
-        catch (IOException)
-        {
-            return new TokenCache();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            return new TokenCache();
-        }
-        catch (JsonException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
         {
             return new TokenCache();
         }
@@ -63,11 +55,7 @@ internal sealed class TokenCache
             var json = JsonSerializer.Serialize(this, TokenCacheJsonContext.Default.TokenCache);
             File.WriteAllText(CachePath, json);
         }
-        catch (IOException)
-        {
-            // Best effort
-        }
-        catch (UnauthorizedAccessException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
             // Best effort
         }
