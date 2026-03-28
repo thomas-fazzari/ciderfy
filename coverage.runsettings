@@ -4,7 +4,7 @@
     <DataCollectors>
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
-          <Exclude>[Ciderfy]Ciderfy.Tui.*,[Ciderfy]Ciderfy.DependencyInjection.*</Exclude>
+          <Exclude>[Ciderfy]Ciderfy.Tui.*,[Ciderfy]Ciderfy.DependencyInjection.*,[Ciderfy]Ciderfy.Configuration.*</Exclude>
           <ExcludeByFile>**/Program.cs</ExcludeByFile>
         </Configuration>
       </DataCollector>
