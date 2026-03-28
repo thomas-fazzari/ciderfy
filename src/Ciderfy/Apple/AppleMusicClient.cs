@@ -27,6 +27,8 @@ internal sealed class AppleMusicClient(
 ) : IDisposable
 {
     private const string ApiBaseUrl = "https://api.music.apple.com/v1";
+    private const string AuthorizationHeader = "Authorization";
+    private const string MusicUserTokenHeader = "Music-User-Token";
 
     private readonly HttpClient _httpClient = httpClient;
     private readonly TokenCache _tokenCache = tokenCache;
@@ -52,12 +54,11 @@ internal sealed class AppleMusicClient(
         const int batchSize = 25;
         var result = new Dictionary<string, AppleMusicTrack>(StringComparer.OrdinalIgnoreCase);
 
-        for (var i = 0; i < isrcs.Count; i += batchSize)
+        foreach (var batch in isrcs.Chunk(batchSize))
         {
             ct.ThrowIfCancellationRequested();
 
-            var end = Math.Min(i + batchSize, isrcs.Count);
-            var joined = string.Join(',', isrcs.Take(new Range(i, end)));
+            var joined = string.Join(',', batch);
             var url = $"{ApiBaseUrl}/catalog/{storefront}/songs?filter[isrc]={joined}";
             var json = await GetWithRateLimitAsync(url, authHeaders, ct);
 
@@ -159,12 +160,10 @@ internal sealed class AppleMusicClient(
 
         const int batchSize = 100;
 
-        for (var i = 0; i < trackIds.Count; i += batchSize)
+        foreach (var batch in trackIds.Chunk(batchSize))
         {
             ct.ThrowIfCancellationRequested();
 
-            var end = Math.Min(i + batchSize, trackIds.Count);
-            var batch = trackIds.Take(new Range(i, end));
             var payload = new { data = batch.Select(id => new { id, type = "songs" }).ToArray() };
 
             var json = JsonSerializer.Serialize(payload);
@@ -180,26 +179,23 @@ internal sealed class AppleMusicClient(
 
     private Dictionary<string, string> GenerateAuthHeaders(bool requireUserToken)
     {
-        if (
-            string.IsNullOrWhiteSpace(_tokenCache.DeveloperToken)
-            || !_tokenCache.HasValidDeveloperToken
-        )
+        if (!_tokenCache.HasValidDeveloperToken)
             throw new AppleMusicUnauthorizedException();
 
         var headers = new Dictionary<string, string>
         {
-            ["Authorization"] = $"Bearer {_tokenCache.DeveloperToken}",
+            [AuthorizationHeader] = $"Bearer {_tokenCache.DeveloperToken}",
         };
 
         if (!requireUserToken)
             return headers;
 
-        if (string.IsNullOrWhiteSpace(_tokenCache.UserToken) || !_tokenCache.HasValidUserToken)
+        if (!_tokenCache.HasValidUserToken)
             throw new InvalidOperationException(
                 "User token is required for this operation. Run '/auth' first."
             );
 
-        headers["Music-User-Token"] = _tokenCache.UserToken;
+        headers[MusicUserTokenHeader] = _tokenCache.UserToken!;
         return headers;
     }
 

@@ -46,24 +46,24 @@ internal sealed class PlaylistTransferService(
         // Partition tracks by ISRC availability
         var matched = new List<MatchResult.Matched>();
         var unmatched = new List<TrackMetadata>();
-        var isrcs = new List<string>();
         var withIsrc = new List<TrackMetadata>();
 
         foreach (var track in enriched)
         {
             if (!string.IsNullOrEmpty(track.Isrc))
-            {
                 withIsrc.Add(track);
-                isrcs.Add(track.Isrc!);
-            }
             else
                 unmatched.Add(track);
         }
 
         // Batch ISRC lookup on Apple Music
         var isrcMap =
-            isrcs.Count > 0
-                ? await appleMusicClient.BatchSearchByIsrcAsync(isrcs, storefront, ct)
+            withIsrc.Count > 0
+                ? await appleMusicClient.BatchSearchByIsrcAsync(
+                    withIsrc.ConvertAll(t => t.Isrc!),
+                    storefront,
+                    ct
+                )
                 : [];
 
         foreach (var track in withIsrc)

@@ -24,8 +24,8 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     )
     {
         var cleanTitle = spotifyTrack.Title;
-        var primaryTitle = ExtractPrimaryTitle(NormalizeForComparison(cleanTitle));
         var normalizedClean = NormalizeForComparison(cleanTitle);
+        var primaryTitle = ExtractPrimaryTitle(normalizedClean);
 
         var queries = new List<string>(3) { $"{cleanTitle} {spotifyTrack.Artist}" };
 
