@@ -33,4 +33,18 @@ jobs:
         run: dotnet build Ciderfy.slnx --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test Ciderfy.slnx --no-build --configuration Release
+        run: |
+          dotnet test Ciderfy.slnx --no-build --configuration Release \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage
+
+      - name: Find coverage files
+        id: coverage
+        run: |
+          files=$(find ./coverage -name 'coverage.cobertura.xml' | paste -sd ',')
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v6
+        with:
+          files: ${{ steps.coverage.outputs.files }}
