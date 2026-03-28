@@ -1,37 +1,22 @@
-using System.Text;
-using System.Text.Json;
 using Ciderfy.Apple;
+using Ciderfy.Tests.Fakers;
 using Xunit;
 
 namespace Ciderfy.Tests;
 
 public class AppleMusicAuthTests
 {
-    // Builds a minimal base64url-encoded JWT: header.payload.signature
-    private static string MakeJwt(object header, object payload)
-    {
-        var headerJson = JsonSerializer.Serialize(header);
-        var payloadJson = JsonSerializer.Serialize(payload);
-        return $"{B64Url(headerJson)}.{B64Url(payloadJson)}.fakesig";
-    }
+    private const string ValidAlg = "ES256";
+    private const string TestKid = "ABCD1234";
+    private const string TestIssuer = "TEAMID";
 
-    private static string B64Url(string json) =>
-        Convert
-            .ToBase64String(Encoding.UTF8.GetBytes(json))
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
-
-    private static long FutureExp => DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
-    private static long PastExp => DateTimeOffset.UtcNow.AddHours(-1).ToUnixTimeSeconds();
-    private static long SoonExp => DateTimeOffset.UtcNow.AddMinutes(3).ToUnixTimeSeconds();
-
+    // IsAppleMusicJwt
     [Fact]
     public void IsAppleMusicJwt_ValidToken_ReturnsTrue()
     {
-        var jwt = MakeJwt(
-            new { alg = "ES256", kid = "ABCD1234" },
-            new { iss = "TEAMID", exp = FutureExp }
+        var jwt = JwtFaker.Make(
+            new { alg = ValidAlg, kid = TestKid },
+            new { iss = TestIssuer, exp = JwtFaker.FutureExp }
         );
 
         Assert.True(AppleMusicAuth.IsAppleMusicJwt(jwt));
@@ -40,9 +25,9 @@ public class AppleMusicAuthTests
     [Fact]
     public void IsAppleMusicJwt_WrongAlgorithm_ReturnsFalse()
     {
-        var jwt = MakeJwt(
-            new { alg = "RS256", kid = "ABCD1234" },
-            new { iss = "TEAMID", exp = FutureExp }
+        var jwt = JwtFaker.Make(
+            new { alg = "RS256", kid = TestKid },
+            new { iss = TestIssuer, exp = JwtFaker.FutureExp }
         );
 
         Assert.False(AppleMusicAuth.IsAppleMusicJwt(jwt));
@@ -51,7 +36,10 @@ public class AppleMusicAuthTests
     [Fact]
     public void IsAppleMusicJwt_MissingKid_ReturnsFalse()
     {
-        var jwt = MakeJwt(new { alg = "ES256" }, new { iss = "TEAMID", exp = FutureExp });
+        var jwt = JwtFaker.Make(
+            new { alg = ValidAlg },
+            new { iss = TestIssuer, exp = JwtFaker.FutureExp }
+        );
 
         Assert.False(AppleMusicAuth.IsAppleMusicJwt(jwt));
     }
@@ -59,7 +47,10 @@ public class AppleMusicAuthTests
     [Fact]
     public void IsAppleMusicJwt_MissingIss_ReturnsFalse()
     {
-        var jwt = MakeJwt(new { alg = "ES256", kid = "ABCD1234" }, new { exp = FutureExp });
+        var jwt = JwtFaker.Make(
+            new { alg = ValidAlg, kid = TestKid },
+            new { exp = JwtFaker.FutureExp }
+        );
 
         Assert.False(AppleMusicAuth.IsAppleMusicJwt(jwt));
     }
@@ -67,7 +58,7 @@ public class AppleMusicAuthTests
     [Fact]
     public void IsAppleMusicJwt_MissingExp_ReturnsFalse()
     {
-        var jwt = MakeJwt(new { alg = "ES256", kid = "ABCD1234" }, new { iss = "TEAMID" });
+        var jwt = JwtFaker.Make(new { alg = ValidAlg, kid = TestKid }, new { iss = TestIssuer });
 
         Assert.False(AppleMusicAuth.IsAppleMusicJwt(jwt));
     }
@@ -75,9 +66,9 @@ public class AppleMusicAuthTests
     [Fact]
     public void IsAppleMusicJwt_ExpiredToken_ReturnsFalse()
     {
-        var jwt = MakeJwt(
-            new { alg = "ES256", kid = "ABCD1234" },
-            new { iss = "TEAMID", exp = PastExp }
+        var jwt = JwtFaker.Make(
+            new { alg = ValidAlg, kid = TestKid },
+            new { iss = TestIssuer, exp = JwtFaker.PastExp }
         );
 
         Assert.False(AppleMusicAuth.IsAppleMusicJwt(jwt));
@@ -86,9 +77,9 @@ public class AppleMusicAuthTests
     [Fact]
     public void IsAppleMusicJwt_ExpiresInLessThan5Minutes_ReturnsFalse()
     {
-        var jwt = MakeJwt(
-            new { alg = "ES256", kid = "ABCD1234" },
-            new { iss = "TEAMID", exp = SoonExp }
+        var jwt = JwtFaker.Make(
+            new { alg = ValidAlg, kid = TestKid },
+            new { iss = TestIssuer, exp = JwtFaker.SoonExp }
         );
 
         Assert.False(AppleMusicAuth.IsAppleMusicJwt(jwt));
@@ -112,9 +103,9 @@ public class AppleMusicAuthTests
     public void GetJwtExpiry_ValidToken_ReturnsExpiry()
     {
         var expectedExp = DateTimeOffset.UtcNow.AddHours(1);
-        var jwt = MakeJwt(
-            new { alg = "ES256", kid = "ABCD1234" },
-            new { iss = "TEAMID", exp = expectedExp.ToUnixTimeSeconds() }
+        var jwt = JwtFaker.Make(
+            new { alg = ValidAlg, kid = TestKid },
+            new { iss = TestIssuer, exp = expectedExp.ToUnixTimeSeconds() }
         );
 
         var expiry = AppleMusicAuth.GetJwtExpiry(jwt);
@@ -126,7 +117,7 @@ public class AppleMusicAuthTests
     [Fact]
     public void GetJwtExpiry_MissingExp_ReturnsNull()
     {
-        var jwt = MakeJwt(new { alg = "ES256", kid = "ABCD1234" }, new { iss = "TEAMID" });
+        var jwt = JwtFaker.Make(new { alg = ValidAlg, kid = TestKid }, new { iss = TestIssuer });
 
         Assert.Null(AppleMusicAuth.GetJwtExpiry(jwt));
     }

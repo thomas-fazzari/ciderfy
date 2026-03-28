@@ -1,4 +1,3 @@
-using Bogus;
 using Ciderfy.Matching;
 using Ciderfy.Tests.Fakers;
 using Xunit;
