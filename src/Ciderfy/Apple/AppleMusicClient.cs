@@ -290,7 +290,7 @@ internal sealed class AppleMusicClient(
         return null;
     }
 
-    private static AppleMusicTrack? ParseTrack(JsonElement element)
+    internal static AppleMusicTrack? ParseTrack(JsonElement element)
     {
         if (
             !element.TryGetProperty("id", out var id)

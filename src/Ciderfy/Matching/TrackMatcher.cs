@@ -183,7 +183,7 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         return FindBestMatch(spotifyTrack, candidates);
     }
 
-    private static MatchResult.Matched? FindBestMatch(
+    internal static MatchResult.Matched? FindBestMatch(
         TrackMetadata spotifyTrack,
         List<AppleMusicTrack> candidates
     )

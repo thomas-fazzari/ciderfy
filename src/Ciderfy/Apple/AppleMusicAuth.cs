@@ -101,7 +101,7 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
         );
     }
 
-    private static bool IsAppleMusicJwt(string token)
+    internal static bool IsAppleMusicJwt(string token)
     {
         try
         {
@@ -139,7 +139,7 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
         }
     }
 
-    private static DateTimeOffset? GetJwtExpiry(string token)
+    internal static DateTimeOffset? GetJwtExpiry(string token)
     {
         try
         {

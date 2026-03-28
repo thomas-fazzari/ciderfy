@@ -336,4 +336,102 @@ public class TrackMatcherTests
 
         Assert.True(withDuration < textOnly, $"Expected {withDuration} < {textOnly}");
     }
+
+    [Fact]
+    public void FindBestMatch_EmptyCandidates_ReturnsNull()
+    {
+        var spotify = SpotifyTrackFaker.Default.Generate();
+
+        var result = TrackMatcher.FindBestMatch(spotify, []);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FindBestMatch_AllBelowThreshold_ReturnsNull()
+    {
+        var spotify = SpotifyTrackFaker
+            .Default.Clone()
+            .RuleFor(t => t.Title, "Revolution 909")
+            .RuleFor(t => t.Artist, "Daft Punk")
+            .Generate();
+
+        var candidates = new[]
+        {
+            AppleTrackFaker
+                .Default.Clone()
+                .RuleFor(t => t.Title, "Bohemian Rhapsody")
+                .RuleFor(t => t.Artist, "Queen")
+                .Generate(),
+            AppleTrackFaker
+                .Default.Clone()
+                .RuleFor(t => t.Title, "Hotel California")
+                .RuleFor(t => t.Artist, "Eagles")
+                .Generate(),
+        }.ToList();
+
+        var result = TrackMatcher.FindBestMatch(spotify, candidates);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FindBestMatch_OneAboveThreshold_ReturnsThatMatch()
+    {
+        var spotify = SpotifyTrackFaker
+            .Default.Clone()
+            .RuleFor(t => t.Title, "Fortunate Son")
+            .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
+            .Generate();
+
+        var expected = AppleTrackFaker
+            .Default.Clone()
+            .RuleFor(t => t.Title, "Fortunate Son")
+            .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
+            .Generate();
+
+        var candidates = new[]
+        {
+            AppleTrackFaker
+                .Default.Clone()
+                .RuleFor(t => t.Title, "Bohemian Rhapsody")
+                .RuleFor(t => t.Artist, "Queen")
+                .Generate(),
+            expected,
+        }.ToList();
+
+        var result = TrackMatcher.FindBestMatch(spotify, candidates);
+
+        Assert.NotNull(result);
+        Assert.Equal(expected.Id, result.AppleTrack.Id);
+    }
+
+    [Fact]
+    public void FindBestMatch_MultipleAboveThreshold_ReturnsBestScore()
+    {
+        var spotify = SpotifyTrackFaker
+            .Default.Clone()
+            .RuleFor(t => t.Title, "Fortunate Son")
+            .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
+            .Generate();
+
+        var bestCandidate = AppleTrackFaker
+            .Default.Clone()
+            .RuleFor(t => t.Title, "Fortunate Son")
+            .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
+            .Generate();
+
+        var worseCandidate = AppleTrackFaker
+            .Default.Clone()
+            .RuleFor(t => t.Title, "Fortunate Son")
+            .RuleFor(t => t.Artist, "CCR")
+            .Generate();
+
+        var candidates = new[] { worseCandidate, bestCandidate }.ToList();
+
+        var result = TrackMatcher.FindBestMatch(spotify, candidates);
+
+        Assert.NotNull(result);
+        Assert.Equal(bestCandidate.Id, result.AppleTrack.Id);
+    }
 }
