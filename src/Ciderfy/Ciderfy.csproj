@@ -3,6 +3,7 @@
     <OutputType>Exe</OutputType>
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>ciderfy</ToolCommandName>
+    <AssemblyName>ciderfy</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>

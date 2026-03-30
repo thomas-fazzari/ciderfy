@@ -1,4 +1,4 @@
-name: Release to NuGet
+name: Release
 
 on:
   push:
@@ -6,11 +6,8 @@ on:
       - "v*"
 
 jobs:
-  release:
+  test:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-
     steps:
       - uses: actions/checkout@v6
 
@@ -28,6 +25,94 @@ jobs:
       - name: Test
         run: dotnet test -c Release --no-build
 
+  publish-binaries:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            rid: osx-arm64
+            artifact: ciderfy-osx-arm64
+          - os: ubuntu-latest
+            rid: osx-x64
+            artifact: ciderfy-osx-x64
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: ciderfy-linux-x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish
+        run: |
+          dotnet publish src/Ciderfy -c Release -r ${{ matrix.rid }} \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:EnableCompressionInSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o ./publish
+
+      - name: Archive
+        run: tar -czf ${{ matrix.artifact }}.tar.gz -C ./publish .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.tar.gz
+
+  github-release:
+    needs: publish-binaries
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          cd artifacts
+          sha256sum *.tar.gz > checksums.txt
+          cat checksums.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/*.tar.gz
+            artifacts/checksums.txt
+          generate_release_notes: true
+
+  nuget:
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build -c Release --no-restore
+
       - name: Extract version from tag
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
@@ -37,3 +122,83 @@ jobs:
 
       - name: Push to NuGet
         run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
+
+  update-homebrew:
+    needs: github-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Extract version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          merge-multiple: true
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          echo "arm64=$(sha256sum artifacts/ciderfy-osx-arm64.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "x64=$(sha256sum artifacts/ciderfy-osx-x64.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+          echo "linux=$(sha256sum artifacts/ciderfy-linux-x64.tar.gz | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap repo
+        uses: actions/checkout@v6
+        with:
+          repository: thomas-fazzari/homebrew-ciderfy
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SHA_ARM64: ${{ steps.sha.outputs.arm64 }}
+          SHA_X64: ${{ steps.sha.outputs.x64 }}
+          SHA_LINUX: ${{ steps.sha.outputs.linux }}
+        run: |
+          cat > homebrew-tap/Formula/ciderfy.rb << EOF
+          class Ciderfy < Formula
+            desc "CLI tool to transfer Spotify playlists to Apple Music"
+            homepage "https://github.com/thomas-fazzari/ciderfy"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/thomas-fazzari/ciderfy/releases/download/v${VERSION}/ciderfy-osx-arm64.tar.gz"
+                sha256 "${SHA_ARM64}"
+              else
+                url "https://github.com/thomas-fazzari/ciderfy/releases/download/v${VERSION}/ciderfy-osx-x64.tar.gz"
+                sha256 "${SHA_X64}"
+              end
+            end
+
+            on_linux do
+              url "https://github.com/thomas-fazzari/ciderfy/releases/download/v${VERSION}/ciderfy-linux-x64.tar.gz"
+              sha256 "${SHA_LINUX}"
+            end
+
+            def install
+              bin.install "ciderfy"
+            end
+
+            test do
+              assert_predicate bin/"ciderfy", :executable?
+            end
+          end
+          EOF
+
+      - name: Push formula update
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/ciderfy.rb
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Update ciderfy to ${VERSION}"
+          git push
