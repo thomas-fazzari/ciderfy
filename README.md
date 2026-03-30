@@ -25,13 +25,23 @@ A .NET 10 CLI tool to transfer Spotify playlists to Apple Music without any deve
 
 ## Installation
 
+### Homebrew (recommended)
+
+```bash
+brew tap thomas-fazzari/ciderfy
+brew install ciderfy
+```
+
+### .NET Tool
+
 ```bash
 dotnet tool install -g Ciderfy
 ```
 
+> Requires .NET SDK 10.0+
+
 ### Requirements
 
-- .NET SDK 10.0+
 - Apple Music account
 
 ## How It Works
