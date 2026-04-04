@@ -9,48 +9,45 @@ namespace Ciderfy.DependencyInjection;
 
 internal static class AppleExtensions
 {
-    extension<T>(T services)
-        where T : IServiceCollection
+    public static IServiceCollection AddApple(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
-        public IServiceCollection AddApple(IConfiguration configuration)
-        {
-            services.AddSingleton(TokenCache.Load());
+        services.AddSingleton(TokenCache.Load());
 
-            services
-                .AddOptions<AppleMusicClientOptions>()
-                .Bind(configuration.GetSection(AppleMusicClientOptions.SectionName))
-                .ValidateDataAnnotations()
-                .ValidateOnStart();
+        services
+            .AddOptions<AppleMusicClientOptions>()
+            .Bind(configuration.GetSection(AppleMusicClientOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
-            services
-                .AddOptions<AppleMusicAuthOptions>()
-                .Bind(configuration.GetSection(AppleMusicAuthOptions.SectionName))
-                .ValidateDataAnnotations()
-                .ValidateOnStart();
+        services
+            .AddOptions<AppleMusicAuthOptions>()
+            .Bind(configuration.GetSection(AppleMusicAuthOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
-            services
-                .AddHttpClient<AppleMusicClient>(
-                    (sp, client) =>
-                    {
-                        var options = sp.GetRequiredService<
-                            IOptions<AppleMusicClientOptions>
-                        >().Value;
-                        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                        HttpClientFactory.ConfigureAppleMusicClient(client);
-                    }
-                )
-                .ConfigurePrimaryHttpMessageHandler(HttpClientFactory.CreateDecompressionHandler);
-
-            services.AddHttpClient<AppleMusicAuth>(
+        services
+            .AddHttpClient<AppleMusicClient>(
                 (sp, client) =>
                 {
-                    var options = sp.GetRequiredService<IOptions<AppleMusicAuthOptions>>().Value;
+                    var options = sp.GetRequiredService<IOptions<AppleMusicClientOptions>>().Value;
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                    HttpClientFactory.ConfigureAppleMusicAuthClient(client);
+                    HttpClientFactory.ConfigureAppleMusicClient(client);
                 }
-            );
+            )
+            .ConfigurePrimaryHttpMessageHandler(HttpClientFactory.CreateDecompressionHandler);
 
-            return services;
-        }
+        services.AddHttpClient<AppleMusicAuth>(
+            (sp, client) =>
+            {
+                var options = sp.GetRequiredService<IOptions<AppleMusicAuthOptions>>().Value;
+                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                HttpClientFactory.ConfigureAppleMusicAuthClient(client);
+            }
+        );
+
+        return services;
     }
 }

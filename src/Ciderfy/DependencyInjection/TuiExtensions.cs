@@ -5,13 +5,9 @@ namespace Ciderfy.DependencyInjection;
 
 internal static class TuiExtensions
 {
-    extension<T>(T services)
-        where T : IServiceCollection
+    public static IServiceCollection AddTui(this IServiceCollection services)
     {
-        public IServiceCollection AddTui()
-        {
-            services.AddSingleton<TuiApp>();
-            return services;
-        }
+        services.AddSingleton<TuiApp>();
+        return services;
     }
 }

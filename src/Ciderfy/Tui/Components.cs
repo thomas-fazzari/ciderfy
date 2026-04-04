@@ -173,7 +173,10 @@ internal static class Components
     )
     {
         const int tableChromeWidth = 10;
-        var indexWidth = Math.Max(2, allResults.Count.ToString().Length);
+        var indexWidth = Math.Max(
+            2,
+            allResults.Count.ToString(System.Globalization.CultureInfo.InvariantCulture).Length
+        );
         var contentWidth = Math.Max(18, width - tableChromeWidth);
         var statusWidth = Math.Clamp(contentWidth / 3, 14, 26);
         var trackWidth = Math.Max(12, contentWidth - indexWidth - statusWidth);

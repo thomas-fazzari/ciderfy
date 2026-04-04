@@ -5,14 +5,13 @@ namespace Ciderfy.DependencyInjection;
 
 internal static class CiderfyExtensions
 {
-    extension<T>(T services)
-        where T : IServiceCollection
-    {
-        public IServiceCollection AddCiderfy(IConfiguration configuration) =>
-            services
-                .AddApple(configuration)
-                .AddSpotify(configuration)
-                .AddMatching(configuration)
-                .AddTui();
-    }
+    public static IServiceCollection AddCiderfy(
+        this IServiceCollection services,
+        IConfiguration configuration
+    ) =>
+        services
+            .AddApple(configuration)
+            .AddSpotify(configuration)
+            .AddMatching(configuration)
+            .AddTui();
 }

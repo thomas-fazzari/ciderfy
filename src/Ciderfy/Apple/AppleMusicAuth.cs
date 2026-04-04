@@ -61,7 +61,9 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
         {
             ct.ThrowIfCancellationRequested();
 
-            var fullUrl = scriptUrl.StartsWith("http") ? scriptUrl : $"{AppleMusicUrl}{scriptUrl}";
+            var fullUrl = scriptUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                ? scriptUrl
+                : $"{AppleMusicUrl}{scriptUrl}";
 
             try
             {

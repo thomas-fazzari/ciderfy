@@ -77,7 +77,10 @@ public class SpotifyClientHttpTests
                 var uri = request.RequestUri!;
                 if (uri.Host == SpotifyHost && uri.AbsolutePath == "/")
                     return Ok(sessionHtml);
-                if (uri.Host == SpotifyHost && uri.AbsolutePath.StartsWith("/api/token"))
+                if (
+                    uri.Host == SpotifyHost
+                    && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
+                )
                     return Ok("""{"accessToken":"tok","clientId":"cid"}""");
                 if (uri.Host == ClientTokenHost)
                     return Ok("""{"granted_token":{"token":"ctok"}}""");

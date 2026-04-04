@@ -1,3 +1,5 @@
+PROJECTS = src/Ciderfy/Ciderfy.csproj tests/Ciderfy.Tests/Ciderfy.Tests.csproj
+
 build:
 	dotnet build
 
@@ -15,6 +17,11 @@ format:
 
 check:
 	dotnet csharpier check .
+	dotnet roslynator analyze $(PROJECTS)
+
+fix:
+	dotnet csharpier format .
+	dotnet roslynator fix $(PROJECTS)
 
 outdated:
 	dotnet dotnet-outdated

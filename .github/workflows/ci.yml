@@ -26,8 +26,17 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-
 
+      - name: Restore tools
+        run: dotnet tool restore
+
       - name: Restore
         run: dotnet restore Ciderfy.slnx
+
+      - name: Check formatting
+        run: dotnet csharpier check .
+
+      - name: Analyze
+        run: dotnet roslynator analyze src/Ciderfy/Ciderfy.csproj tests/Ciderfy.Tests/Ciderfy.Tests.csproj
 
       - name: Build
         run: dotnet build Ciderfy.slnx --no-restore --configuration Release

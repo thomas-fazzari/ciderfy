@@ -95,3 +95,44 @@ dotnet_naming_symbols.private_fields.applicable_accessibilities = private, priva
 
 dotnet_naming_style.camel_case_underscore.required_prefix = _
 dotnet_naming_style.camel_case_underscore.capitalization = camel_case
+
+roslynator_refactorings.enabled = true
+roslynator_compiler_diagnostic_fixes.enabled = true
+
+# Roslynator analyzers
+dotnet_diagnostic.RCS1001.severity = warning   # Add braces when expression spans multiple lines
+dotnet_diagnostic.RCS1018.severity = warning   # Add default access modifier
+dotnet_diagnostic.RCS1033.severity = warning   # Remove redundant boolean literal
+dotnet_diagnostic.RCS1036.severity = warning   # Remove unnecessary blank line
+dotnet_diagnostic.RCS1037.severity = warning   # Remove trailing whitespace
+dotnet_diagnostic.RCS1040.severity = warning   # Remove empty else clause
+dotnet_diagnostic.RCS1041.severity = warning   # Remove empty initializer
+dotnet_diagnostic.RCS1061.severity = warning   # Merge if with nested if
+dotnet_diagnostic.RCS1077.severity = suggestion # Optimize LINQ method call
+dotnet_diagnostic.RCS1097.severity = warning   # Remove redundant ToString call
+dotnet_diagnostic.RCS1118.severity = suggestion # Mark local variable as const
+dotnet_diagnostic.RCS1128.severity = warning   # Use coalesce expression
+dotnet_diagnostic.RCS1129.severity = warning   # Remove redundant field initialization
+dotnet_diagnostic.RCS1132.severity = warning   # Remove redundant overriding member
+dotnet_diagnostic.RCS1163.severity = suggestion # Unused parameter
+dotnet_diagnostic.RCS1168.severity = warning   # Parameter name differs from base name
+dotnet_diagnostic.RCS1169.severity = warning   # Make field read-only
+dotnet_diagnostic.RCS1174.severity = suggestion # Remove redundant async/await
+dotnet_diagnostic.RCS1188.severity = warning   # Remove redundant auto-property initialization
+dotnet_diagnostic.RCS1192.severity = warning   # Unnecessary usage of verbatim string literal
+dotnet_diagnostic.RCS1211.severity = warning   # Remove unnecessary else clause
+dotnet_diagnostic.RCS1212.severity = warning   # Remove redundant assignment
+dotnet_diagnostic.RCS1213.severity = warning   # Remove unused member declaration
+dotnet_diagnostic.RCS1214.severity = suggestion # Unnecessary interpolated string
+dotnet_diagnostic.RCS1215.severity = warning   # Expression is always equal to true/false
+dotnet_diagnostic.RCS1225.severity = suggestion # Make class sealed
+dotnet_diagnostic.RCS1229.severity = suggestion # Use async/await when necessary
+dotnet_diagnostic.RCS1235.severity = suggestion # Optimize method call
+
+# Globalization
+dotnet_diagnostic.CA1305.severity = warning   # Specify IFormatProvider
+dotnet_diagnostic.CA1310.severity = warning   # Specify StringComparison for correctness
+
+# Test files: allow underscore convention
+[tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none

@@ -10,35 +10,34 @@ namespace Ciderfy.DependencyInjection;
 
 internal static class SpotifyExtensions
 {
-    extension<T>(T services)
-        where T : IServiceCollection
+    public static IServiceCollection AddSpotify(
+        this IServiceCollection services,
+        IConfiguration configuration
+    )
     {
-        public IServiceCollection AddSpotify(IConfiguration configuration)
-        {
-            services
-                .AddOptions<SpotifyClientOptions>()
-                .Bind(configuration.GetSection(SpotifyClientOptions.SectionName))
-                .ValidateDataAnnotations()
-                .ValidateOnStart();
+        services
+            .AddOptions<SpotifyClientOptions>()
+            .Bind(configuration.GetSection(SpotifyClientOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
 
-            services.AddSingleton<CookieContainer>();
+        services.AddSingleton<CookieContainer>();
 
-            services
-                .AddHttpClient<SpotifyClient>(
-                    (sp, client) =>
-                    {
-                        var options = sp.GetRequiredService<IOptions<SpotifyClientOptions>>().Value;
-                        client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                        HttpClientFactory.ConfigureSpotifyClient(client);
-                    }
-                )
-                .ConfigurePrimaryHttpMessageHandler(sp => new HttpClientHandler
+        services
+            .AddHttpClient<SpotifyClient>(
+                (sp, client) =>
                 {
-                    CookieContainer = sp.GetRequiredService<CookieContainer>(),
-                    UseCookies = true,
-                });
+                    var options = sp.GetRequiredService<IOptions<SpotifyClientOptions>>().Value;
+                    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                    HttpClientFactory.ConfigureSpotifyClient(client);
+                }
+            )
+            .ConfigurePrimaryHttpMessageHandler(sp => new HttpClientHandler
+            {
+                CookieContainer = sp.GetRequiredService<CookieContainer>(),
+                UseCookies = true,
+            });
 
-            return services;
-        }
+        return services;
     }
 }
