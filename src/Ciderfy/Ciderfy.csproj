@@ -1,8 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <PackAsTool>true</PackAsTool>
-    <ToolCommandName>ciderfy</ToolCommandName>
     <AssemblyName>ciderfy</AssemblyName>
   </PropertyGroup>
 

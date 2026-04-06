@@ -95,34 +95,6 @@ jobs:
             artifacts/checksums.txt
           generate_release_notes: true
 
-  nuget:
-    needs: test
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: "10.0.x"
-
-      - name: Restore
-        run: dotnet restore
-
-      - name: Build
-        run: dotnet build -c Release --no-restore
-
-      - name: Extract version from tag
-        id: version
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
-
-      - name: Pack
-        run: dotnet pack src/Ciderfy -c Release --no-build -o ./artifacts /p:PackageVersion=${{ steps.version.outputs.version }}
-
-      - name: Push to NuGet
-        run: dotnet nuget push ./artifacts/*.nupkg --api-key ${{ secrets.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json
-
   update-homebrew:
     needs: github-release
     runs-on: ubuntu-latest

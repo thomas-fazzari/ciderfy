@@ -5,16 +5,15 @@
 <p align="center">
   <a href="https://github.com/thomas-fazzari/ciderfy/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/thomas-fazzari/ciderfy/ci.yml?branch=master&style=flat-square&labelColor=11111B&label=CI&logo=githubactions&logoColor=white" alt="CI"></a>
   <a href="https://codecov.io/gh/thomas-fazzari/ciderfy"><img src="https://img.shields.io/codecov/c/github/thomas-fazzari/ciderfy?style=flat-square&labelColor=11111B&logo=codecov&logoColor=white" alt="Coverage"></a>
-  <a href="https://www.nuget.org/packages/Ciderfy"><img src="https://img.shields.io/nuget/v/Ciderfy?style=flat-square&labelColor=11111B&color=313244&logo=nuget&logoColor=white" alt="NuGet"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-313244?style=flat-square&labelColor=11111B&logo=opensourceinitiative&logoColor=white" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/.NET-10.0-313244?style=flat-square&labelColor=11111B&logo=dotnet&logoColor=white" alt=".NET 10">
 </p>
 
-A .NET 10 CLI tool to transfer Spotify playlists to Apple Music without any developer accounts required
+A .NET 10 TUI tool to transfer Spotify playlists to Apple Music without any developer accounts required
 
 ## Features
 
-- Interactive modern CLI built with Spectre.Console
+- Interactive modern TUI app built with Spectre.Console
 - Spotify playlist import from standard URLs, embed URLs, intl URLs, and `spotify:` URIs
 - Playlist Merging: Queue multiple Spotify playlists with `/add <url>` and merge them into a single deduplicated Apple Music playlist with `/run`
 - Two-stage matching pipeline:
@@ -31,14 +30,6 @@ A .NET 10 CLI tool to transfer Spotify playlists to Apple Music without any deve
 brew tap thomas-fazzari/ciderfy
 brew install ciderfy
 ```
-
-### .NET Tool
-
-```bash
-dotnet tool install -g Ciderfy
-```
-
-> Requires .NET SDK 10.0+
 
 ### Requirements
 
