@@ -49,21 +49,21 @@ internal sealed partial class TuiApp
         if (key is not { Key: ConsoleKey.C, Modifiers: ConsoleModifiers.Control })
             return false;
 
-        _quit = true;
+        _state.QuitRequested = true;
         _cts.Cancel();
         return true;
     }
 
     private bool TryHandlePlaylistConfirmInput(ConsoleKeyInfo key)
     {
-        if (_phase is not TuiTransferPhase.ConfirmPlaylist)
+        if (_state.Phase is not TuiTransferPhase.ConfirmPlaylist)
             return false;
 
         if (key.Key is ConsoleKey.Enter)
         {
-            _phase = TuiTransferPhase.ResolvingIsrc;
-            _progressCurrent = 0;
-            _progressTotal = _transferTracks?.Count ?? 0;
+            _state.Phase = TuiTransferPhase.ResolvingIsrc;
+            _state.ProgressCurrent = 0;
+            _state.ProgressTotal = _state.TransferTracks?.Count ?? 0;
             _logs.Append(LogKind.Info, "Starting ISRC matching...");
             _ = Task.Run(() => RunIsrcMatchAsync(_cts.Token));
         }
@@ -78,7 +78,7 @@ internal sealed partial class TuiApp
 
     private bool TryHandleConfirmPhaseInput(ConsoleKeyInfo key)
     {
-        if (_phase is not TuiTransferPhase.ConfirmTextMatch)
+        if (_state.Phase is not TuiTransferPhase.ConfirmTextMatch)
             return false;
 
         HandleConfirmKey(key);
@@ -87,7 +87,7 @@ internal sealed partial class TuiApp
 
     private bool TryHandleDonePhaseInput(ConsoleKeyInfo key)
     {
-        if (_phase is not TuiTransferPhase.Done)
+        if (_state.Phase is not TuiTransferPhase.Done)
             return false;
 
         switch (key.Key)
@@ -106,21 +106,24 @@ internal sealed partial class TuiApp
         }
     }
 
-    private void ScrollResultsUp() => _scrollOffset = Math.Max(0, _scrollOffset - 1);
+    private void ScrollResultsUp() => _state.ScrollOffset = Math.Max(0, _state.ScrollOffset - 1);
 
     private void ScrollResultsDown()
     {
-        if (_allResults is null)
+        if (_state.AllResults is null)
             return;
 
         var visibleRows = Math.Max(
             3,
             Console.WindowHeight - CurrentFixedChromeHeight - DoneViewChromeHeight
         );
-        _scrollOffset = Math.Min(Math.Max(0, _allResults.Count - visibleRows), _scrollOffset + 1);
+        _state.ScrollOffset = Math.Min(
+            Math.Max(0, _state.AllResults.Count - visibleRows),
+            _state.ScrollOffset + 1
+        );
     }
 
-    private bool CanAcceptGeneralInput() => _phase is TuiTransferPhase.Idle;
+    private bool CanAcceptGeneralInput() => _state.Phase is TuiTransferPhase.Idle;
 
     private void HandleGeneralInput(ConsoleKeyInfo key)
     {
@@ -158,23 +161,23 @@ internal sealed partial class TuiApp
         switch (char.ToLowerInvariant(key.KeyChar))
         {
             case 'y' or '\r' or '\n':
-                _phase = TuiTransferPhase.TextMatching;
-                _progressCurrent = 0;
-                _progressTotal = _unmatchedTracks?.Count ?? 0;
-                _progressLabel = string.Empty;
+                _state.Phase = TuiTransferPhase.TextMatching;
+                _state.ProgressCurrent = 0;
+                _state.ProgressTotal = _state.UnmatchedTracks?.Count ?? 0;
+                _state.ProgressLabel = string.Empty;
                 _logs.Append(LogKind.Info, "Starting text matching...");
                 _ = Task.Run(() => RunTextMatchAsync(_cts.Token));
                 break;
             case 'n':
                 _logs.Append(LogKind.Info, "Text matching skipped.");
-                if (_unmatchedTracks is not null)
+                if (_state.UnmatchedTracks is not null)
                 {
-                    _textResults ??= [];
-                    foreach (var t in _unmatchedTracks)
-                        _textResults.Add(new MatchResult.NotFound(t, "Skipped"));
+                    _state.TextResults ??= [];
+                    foreach (var t in _state.UnmatchedTracks)
+                        _state.TextResults.Add(new MatchResult.NotFound(t, "Skipped"));
                 }
 
-                _phase = TuiTransferPhase.CreatingPlaylist;
+                _state.Phase = TuiTransferPhase.CreatingPlaylist;
                 _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token));
                 break;
         }
@@ -182,7 +185,7 @@ internal sealed partial class TuiApp
 
     private void HandleEnter()
     {
-        _showHelp = false;
+        _state.ShowHelp = false;
 
         var raw = _inputBuffer.ToString().Trim();
         _inputBuffer.Clear();
@@ -190,7 +193,7 @@ internal sealed partial class TuiApp
         if (string.IsNullOrEmpty(raw))
             return;
 
-        if (_awaitingUserToken)
+        if (_state.AwaitingUserToken)
         {
             HandleUserTokenInput(raw);
             return;
@@ -204,18 +207,18 @@ internal sealed partial class TuiApp
 
         if (SpotifyUrlInfo.TryParse(raw, out var urlInfo))
         {
-            if (_queuedPlaylistUrls.Count > 0)
+            if (_state.QueuedPlaylistUrls.Count > 0)
             {
-                _queuedPlaylistUrls.Add(urlInfo.Id);
+                _state.QueuedPlaylistUrls.Add(urlInfo.Id);
                 _logs.Append(
                     LogKind.Success,
-                    $"Added to merge queue (Total: {_queuedPlaylistUrls.Count}). Type /run to start."
+                    $"Added to merge queue (Total: {_state.QueuedPlaylistUrls.Count}). Type /run to start."
                 );
                 return;
             }
 
             ResetTransferState();
-            _phase = TuiTransferPhase.FetchingPlaylist;
+            _state.Phase = TuiTransferPhase.FetchingPlaylist;
             _logs.Clear();
             _logs.Append(LogKind.Info, "Starting transfer...");
             _ = Task.Run(() => RunFetchPlaylistAsync([urlInfo.Id], _cts.Token));
@@ -238,142 +241,8 @@ internal sealed partial class TuiApp
         tokenCache.UserTokenExpiry = DateTimeOffset.UtcNow.AddMonths(3);
         tokenCache.Save();
 
-        _awaitingUserToken = false;
+        _state.AwaitingUserToken = false;
         _logs.Append(LogKind.Success, "Authentication complete! Tokens cached.");
         _logs.Append(LogKind.Info, StatusSummary());
-    }
-
-    private void HandleCommand(string raw)
-    {
-        var parts = raw.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        var cmd = parts[0];
-        var arg = parts.Length > 1 ? parts[1].Trim() : null;
-
-        if (_commands.TryExecute(cmd, arg))
-            return;
-
-        _logs.Append(LogKind.Error, $"Unknown command: {cmd.ToLowerInvariant()}. Type /help");
-    }
-
-    private void EnsureCommandsRegistered()
-    {
-        _commands.Register(HandleQuitCommand, "/quit", "/exit", "/q");
-        _commands.Register(HandleHelpCommand, "/help", "/h");
-        _commands.Register(HandleStatusCommand, "/status");
-        _commands.Register(HandleStorefrontCommand, "/storefront", "/sf");
-        _commands.Register(HandleNameCommand, "/name");
-        _commands.Register(HandleAuthCommand, "/auth");
-        _commands.Register(HandleAddCommand, "/add");
-        _commands.Register(HandleRunCommand, "/run");
-    }
-
-    private void HandleQuitCommand(string? _)
-    {
-        _quit = true;
-        _cts.Cancel();
-    }
-
-    private void HandleHelpCommand(string? _) => _showHelp = !_showHelp;
-
-    private void HandleStatusCommand(string? _) => _logs.Append(LogKind.Info, StatusSummary());
-
-    private void HandleStorefrontCommand(string? argument)
-    {
-        if (string.IsNullOrEmpty(argument))
-        {
-            _logs.Append(LogKind.Info, $"Storefront: {_storefront}. Usage: /storefront fr");
-            return;
-        }
-
-        _storefront = argument.ToLowerInvariant();
-        _logs.Append(LogKind.Success, $"Storefront set to {_storefront}");
-    }
-
-    private void HandleNameCommand(string? argument)
-    {
-        if (string.IsNullOrEmpty(argument))
-        {
-            _nextPlaylistName = null;
-            _logs.Append(LogKind.Success, "Playlist name override cleared");
-            return;
-        }
-
-        _nextPlaylistName = argument;
-        _logs.Append(LogKind.Success, $"Next playlist name set to \"{_nextPlaylistName}\"");
-    }
-
-    private void HandleAuthCommand(string? argument)
-    {
-        _logs.Clear();
-
-        if ("reset".Equals(argument, StringComparison.OrdinalIgnoreCase))
-        {
-            tokenCache.Clear();
-            _logs.Append(LogKind.Warning, "Tokens cleared.");
-        }
-
-        _logs.Append(LogKind.Info, "Authenticating...");
-        _ = Task.Run(() => RunAuthAsync(_cts.Token));
-    }
-
-    private void HandleAddCommand(string? argument)
-    {
-        if (string.IsNullOrWhiteSpace(argument))
-        {
-            _logs.Append(LogKind.Error, "Usage: /add <url1> [url2] ...");
-            return;
-        }
-
-        var urls = argument.Split(
-            ' ',
-            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-        );
-        var addedCount = 0;
-
-        foreach (var url in urls)
-        {
-            if (SpotifyUrlInfo.TryParse(url, out var urlInfo))
-            {
-                if (!_queuedPlaylistUrls.Contains(urlInfo.Id))
-                {
-                    _queuedPlaylistUrls.Add(urlInfo.Id);
-                    addedCount++;
-                }
-            }
-        }
-
-        if (addedCount > 0)
-        {
-            _logs.Append(
-                LogKind.Success,
-                $"Added {addedCount} playlists to queue. ({_queuedPlaylistUrls.Count} total)"
-            );
-            _logs.Append(LogKind.Info, "Type /run to start merging.");
-        }
-        else
-        {
-            _logs.Append(LogKind.Error, "No valid Spotify URLs found.");
-        }
-    }
-
-    private void HandleRunCommand(string? argument)
-    {
-        if (_queuedPlaylistUrls.Count == 0)
-        {
-            _logs.Append(LogKind.Error, "Queue is empty. Add playlists with /add <url>");
-            return;
-        }
-
-        var playlistIdsToFetch = _queuedPlaylistUrls.ToList();
-        _queuedPlaylistUrls.Clear();
-
-        ResetTransferState();
-        _phase = TuiTransferPhase.FetchingPlaylist;
-        _logs.Clear();
-        _logs.Append(
-            LogKind.Info,
-            $"Starting transfer of {playlistIdsToFetch.Count} merged playlists..."
-        );
-        _ = Task.Run(() => RunFetchPlaylistAsync(playlistIdsToFetch, _cts.Token));
     }
 }

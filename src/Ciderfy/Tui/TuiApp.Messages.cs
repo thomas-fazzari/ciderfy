@@ -5,13 +5,24 @@ namespace Ciderfy.Tui;
 
 internal sealed partial class TuiApp
 {
+    private bool TryHandleMessageError(Exception? error)
+    {
+        if (error is null)
+            return false;
+
+        _state.Phase = TuiTransferPhase.Idle;
+        _state.AwaitingUserToken = false;
+        HandleTransferError(error);
+        return true;
+    }
+
     private void ProcessMessage(TuiMessage msg)
     {
         switch (msg)
         {
             case TickMsg:
-                _spinnerTick++;
-                _cursorVisible = _spinnerTick % 8 < 5; // blinking pattern
+                _state.SpinnerTick++;
+                _state.CursorVisible = _state.SpinnerTick % 8 < 5; // blinking pattern
                 break;
 
             case AuthDoneMsg m:
@@ -23,8 +34,8 @@ internal sealed partial class TuiApp
                 break;
 
             case IsrcProgressMsg m:
-                _progressCurrent = m.Current;
-                _progressTotal = m.Total;
+                _state.ProgressCurrent = m.Current;
+                _state.ProgressTotal = m.Total;
                 break;
 
             case IsrcDoneMsg m:
@@ -32,9 +43,12 @@ internal sealed partial class TuiApp
                 break;
 
             case TextProgressMsg m:
-                _progressCurrent = m.Current;
-                _progressTotal = m.Total;
-                _progressLabel = Components.Truncate($"{m.Track.Artist} - {m.Track.Title}", 55);
+                _state.ProgressCurrent = m.Current;
+                _state.ProgressTotal = m.Total;
+                _state.ProgressLabel = Components.Truncate(
+                    $"{m.Track.Artist} - {m.Track.Title}",
+                    55
+                );
                 break;
 
             case TextDoneMsg m:
@@ -49,12 +63,11 @@ internal sealed partial class TuiApp
 
     private void HandleAuthDone(AuthDoneMsg msg)
     {
-        _phase = TuiTransferPhase.Idle;
-        if (msg.Error is not null)
-        {
-            HandleTransferError(msg.Error);
+        if (TryHandleMessageError(msg.Error))
             return;
-        }
+
+        _state.Phase = TuiTransferPhase.Idle;
+        _state.AwaitingUserToken = false;
 
         _logs.Append(LogKind.Success, "Developer token OK");
         if (!msg.NeedsUserToken)
@@ -64,7 +77,7 @@ internal sealed partial class TuiApp
             return;
         }
 
-        _awaitingUserToken = true;
+        _state.AwaitingUserToken = true;
         _logs.Append(LogKind.Warning, "User token missing.");
         _logs.Append(LogKind.Info, "1) Open https://music.apple.com and sign in");
         _logs.Append(
@@ -76,45 +89,37 @@ internal sealed partial class TuiApp
 
     private void HandlePlaylistFetched(PlaylistFetchedMsg msg)
     {
-        if (msg.Error is not null)
-        {
-            _phase = TuiTransferPhase.Idle;
-            HandleTransferError(msg.Error);
+        if (TryHandleMessageError(msg.Error))
             return;
-        }
 
         var playlists = msg.Playlists;
 
-        _transferTracks = PlaylistMerger.MergeTracks(playlists);
-        _playlistName = PlaylistMerger.ResolveName(playlists, _nextPlaylistName);
+        _state.TransferTracks = PlaylistMerger.MergeTracks(playlists);
+        _state.PlaylistName = PlaylistMerger.ResolveName(playlists, _state.NextPlaylistName);
 
         var mergeInfo =
             playlists.Count > 1 ? $"Merged {playlists.Count} playlists - " : string.Empty;
 
         _logs.Append(
             LogKind.Success,
-            $"Fetched \"{_playlistName}\" ({mergeInfo}{_transferTracks.Count} tracks)"
+            $"Fetched \"{_state.PlaylistName}\" ({mergeInfo}{_state.TransferTracks.Count} tracks)"
         );
         _logs.Append(LogKind.Info, "Preview ready. Enter starts transfer, Esc goes back.");
 
-        _phase = TuiTransferPhase.ConfirmPlaylist;
+        _state.Phase = TuiTransferPhase.ConfirmPlaylist;
     }
 
     private void HandleIsrcDone(IsrcDoneMsg msg)
     {
-        if (msg.Error is not null)
-        {
-            _phase = TuiTransferPhase.Idle;
-            HandleTransferError(msg.Error);
+        if (TryHandleMessageError(msg.Error))
             return;
-        }
 
-        _isrcResults = msg.Matched;
-        _unmatchedTracks = msg.Unmatched;
+        _state.IsrcResults = msg.Matched;
+        _state.UnmatchedTracks = msg.Unmatched;
 
         _logs.Append(
             LogKind.Success,
-            $"{msg.Matched.Count}/{_transferTracks?.Count ?? 0} matched via ISRC"
+            $"{msg.Matched.Count}/{_state.TransferTracks?.Count ?? 0} matched via ISRC"
         );
         if (msg.Unmatched.Count > 0)
             _logs.Append(LogKind.Info, $"{msg.Unmatched.Count} remaining");
@@ -123,49 +128,41 @@ internal sealed partial class TuiApp
 
         if (msg.Unmatched.Count > 0)
         {
-            _phase = TuiTransferPhase.ConfirmTextMatch;
+            _state.Phase = TuiTransferPhase.ConfirmTextMatch;
         }
         else
         {
-            _phase = TuiTransferPhase.CreatingPlaylist;
+            _state.Phase = TuiTransferPhase.CreatingPlaylist;
             _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token));
         }
     }
 
     private void HandleTextDone(TextDoneMsg msg)
     {
-        if (msg.Error is not null)
-        {
-            _phase = TuiTransferPhase.Idle;
-            HandleTransferError(msg.Error);
+        if (TryHandleMessageError(msg.Error))
             return;
-        }
 
-        _textResults = msg.Results;
+        _state.TextResults = msg.Results;
 
         var textMatched = msg.Results?.Count(r => r is MatchResult.Matched) ?? 0;
         _logs.Append(
             LogKind.Success,
-            $"{textMatched}/{_unmatchedTracks?.Count ?? 0} matched via text"
+            $"{textMatched}/{_state.UnmatchedTracks?.Count ?? 0} matched via text"
         );
         _logs.Append(LogKind.Separator, string.Empty);
 
-        _phase = TuiTransferPhase.CreatingPlaylist;
+        _state.Phase = TuiTransferPhase.CreatingPlaylist;
         _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token));
     }
 
     private void HandlePlaylistCreated(PlaylistCreatedMsg msg)
     {
-        if (msg.Error is not null)
-        {
-            _phase = TuiTransferPhase.Idle;
-            HandleTransferError(msg.Error);
+        if (TryHandleMessageError(msg.Error))
             return;
-        }
 
         if (msg.Result is not { Success: true, PlaylistId: not null and not "" })
         {
-            _phase = TuiTransferPhase.Idle;
+            _state.Phase = TuiTransferPhase.Idle;
             var reason = msg.Result switch
             {
                 null => "No response from Apple Music",
@@ -178,10 +175,10 @@ internal sealed partial class TuiApp
         }
 
         _logs.Append(LogKind.Success, $"Playlist created: {msg.Result.PlaylistId}");
-        _nextPlaylistName = null;
-        _allResults = msg.AllResults;
-        _scrollOffset = 0;
-        _phase = TuiTransferPhase.Done;
+        _state.NextPlaylistName = null;
+        _state.AllResults = msg.AllResults;
+        _state.ScrollOffset = 0;
+        _state.Phase = TuiTransferPhase.Done;
     }
 
     private void HandleTransferError(Exception err)
@@ -220,14 +217,14 @@ internal sealed partial class TuiApp
     private List<MatchResult> BuildAllResults()
     {
         var allResults = new List<MatchResult>();
-        var isrcMap = (_isrcResults ?? [])
+        var isrcMap = (_state.IsrcResults ?? [])
             .DistinctBy(m => m.SpotifyTrack.SpotifyId)
             .ToDictionary(m => m.SpotifyTrack.SpotifyId);
-        var textMap = (_textResults ?? [])
+        var textMap = (_state.TextResults ?? [])
             .DistinctBy(m => m.SpotifyTrack.SpotifyId)
             .ToDictionary(m => m.SpotifyTrack.SpotifyId);
 
-        foreach (var track in _transferTracks ?? [])
+        foreach (var track in _state.TransferTracks ?? [])
         {
             if (isrcMap.TryGetValue(track.SpotifyId, out var isrcMatch))
                 allResults.Add(isrcMatch);

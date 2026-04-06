@@ -39,6 +39,7 @@ internal static class Theme
     internal const string Ellipsis = "\u2026";
     internal const string ArrowUp = "\u2191";
     internal const string ArrowDown = "\u2193";
+    internal const string ChevronRight = "\u203A";
     internal const string Bullet = "\u2022";
 
     internal static readonly string[] SpinnerFrames =

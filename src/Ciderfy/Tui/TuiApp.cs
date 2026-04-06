@@ -20,36 +20,7 @@ internal sealed partial class TuiApp(
     private readonly LogBuffer _logs = new();
     private readonly StringBuilder _inputBuffer = new();
     private readonly TuiCommandRegistry _commands = new();
-
-    private TuiTransferPhase _phase = TuiTransferPhase.Idle;
-    private string _storefront = "us";
-    private string? _nextPlaylistName;
-    private bool _awaitingUserToken;
-    private bool _showHelp;
-    private bool _quit;
-
-    // Queue data
-    private readonly List<string> _queuedPlaylistUrls = [];
-
-    // Spinner and progress
-    private int _spinnerTick;
-    private int _progressCurrent;
-    private int _progressTotal;
-    private string _progressLabel = string.Empty;
-
-    // Transfer data
-    private List<TrackMetadata>? _transferTracks;
-    private List<MatchResult.Matched>? _isrcResults;
-    private List<TrackMetadata>? _unmatchedTracks;
-    private List<MatchResult>? _textResults;
-    private string _playlistName = string.Empty;
-
-    // Results scroll
-    private List<MatchResult>? _allResults;
-    private int _scrollOffset;
-
-    // Cursor blink
-    private bool _cursorVisible = true;
+    private readonly TuiState _state = new();
 
     /// <summary>
     /// Enters the alternate screen and runs the TUI event loop until the user quits
@@ -107,7 +78,7 @@ internal sealed partial class TuiApp(
         RenderFinalFrame(ctx);
     }
 
-    private bool ShouldContinueRunning() => !_quit && !_cts.IsCancellationRequested;
+    private bool ShouldContinueRunning() => !_state.QuitRequested && !_cts.IsCancellationRequested;
 
     private void DrainPendingMessages()
     {
@@ -206,8 +177,8 @@ internal sealed partial class TuiApp(
             );
 
             var (matched, unmatched) = await transferService.MatchByIsrcAsync(
-                _transferTracks!,
-                _storefront,
+                _state.TransferTracks!,
+                _state.Storefront,
                 progress,
                 ct
             );
@@ -225,13 +196,13 @@ internal sealed partial class TuiApp(
         {
             var progress = new Progress<TrackMatchProgress>(p =>
                 _channel.Writer.TryWrite(
-                    new TextProgressMsg(p.Track, p.CurrentIndex, _unmatchedTracks!.Count)
+                    new TextProgressMsg(p.Track, p.CurrentIndex, _state.UnmatchedTracks!.Count)
                 )
             );
 
             var results = await transferService.MatchByTextAsync(
-                _unmatchedTracks!,
-                _storefront,
+                _state.UnmatchedTracks!,
+                _state.Storefront,
                 progress,
                 ct
             );
@@ -248,7 +219,11 @@ internal sealed partial class TuiApp(
         try
         {
             var allResults = BuildAllResults();
-            var result = await transferService.CreatePlaylistAsync(_playlistName, allResults, ct);
+            var result = await transferService.CreatePlaylistAsync(
+                _state.PlaylistName,
+                allResults,
+                ct
+            );
             _channel.Writer.TryWrite(new PlaylistCreatedMsg(result, allResults, null));
         }
         catch (Exception ex)
@@ -259,20 +234,7 @@ internal sealed partial class TuiApp(
 
     // Message handling lives in TuiApp.Messages.cs
 
-    private void ResetTransferState()
-    {
-        _phase = TuiTransferPhase.Idle;
-        _progressCurrent = 0;
-        _progressTotal = 0;
-        _progressLabel = string.Empty;
-        _transferTracks = null;
-        _isrcResults = null;
-        _unmatchedTracks = null;
-        _textResults = null;
-        _allResults = null;
-        _playlistName = string.Empty;
-        _scrollOffset = 0;
-    }
+    private void ResetTransferState() => _state.ResetTransferState();
 
     public void Dispose() => _cts.Dispose();
 }

@@ -9,6 +9,8 @@ namespace Ciderfy.Tui;
 /// </summary>
 internal static class Components
 {
+    internal const int MaxVisibleQueuedPlaylists = 3;
+
     private static readonly string[] _bannerLines =
     [
         " ██████╗██╗██████╗ ███████╗██████╗ ███████╗██╗   ██╗",
@@ -18,6 +20,8 @@ internal static class Components
         "╚██████╗██║██████╔╝███████╗██║  ██║██║        ██║   ",
         " ╚═════╝╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝        ╚═╝   ",
     ];
+
+    private static readonly string[] _stepLabels = ["Setup", "Fetch", "Match", "Transfer", "Done"];
 
     internal static IRenderable RenderBanner(int width)
     {
@@ -46,7 +50,7 @@ internal static class Components
         return new Rows(rows);
     }
 
-    internal static IRenderable RenderStatusBadges(
+    internal static Align RenderStatusBadges(
         bool hasValidDeveloperToken,
         bool hasValidUserToken,
         string storefront,
@@ -73,10 +77,77 @@ internal static class Components
         return Align.Center(new Markup($"{devBadge} {userBadge} {sfBadge} {nameBadge}"));
     }
 
+    internal static IRenderable RenderStepper(TuiTransferPhase phase)
+    {
+        var currentStep = phase switch
+        {
+            TuiTransferPhase.FetchingPlaylist => 1,
+            TuiTransferPhase.ResolvingIsrc
+            or TuiTransferPhase.ConfirmTextMatch
+            or TuiTransferPhase.TextMatching => 2,
+            TuiTransferPhase.CreatingPlaylist => 3,
+            TuiTransferPhase.Done => 4,
+            _ => 0,
+        };
+
+        var parts = _stepLabels.Select(
+            (step, index) =>
+            {
+                var escapedStep = Markup.Escape(step);
+                if (index < currentStep)
+                    return $"[{Theme.Teal}]{escapedStep}[/]";
+
+                if (index == currentStep)
+                    return $"[{Theme.Primary} bold]{escapedStep}[/]";
+
+                return $"[{Theme.Muted}]{escapedStep}[/]";
+            }
+        );
+
+        return Align.Center(
+            new Markup(string.Join($" [{Theme.Gray}]{Theme.ChevronRight}[/] ", parts))
+        );
+    }
+
     private static string Badge(string text, string fg, string bg) =>
         $"[{fg} on {bg}] {Markup.Escape(text)} [/]";
 
-    internal static IRenderable RenderLogArea(LogBuffer logs, int width, int height)
+    internal static Panel RenderQueuePanel(IReadOnlyList<string> queuedIds)
+    {
+        var count = queuedIds.Count;
+        var visibleIds = queuedIds.Take(MaxVisibleQueuedPlaylists).ToList();
+        var extra = count - visibleIds.Count;
+
+        var rows = new List<IRenderable>(visibleIds.Count + 1);
+        foreach (var id in visibleIds)
+        {
+            rows.Add(
+                new Markup(
+                    $"[{Theme.Primary}]{Theme.Bullet}[/] [{Theme.Muted}]spotify/playlist/[/][{Theme.White}]{Markup.Escape(id)}[/]"
+                )
+            );
+        }
+
+        if (extra > 0)
+        {
+            rows.Add(
+                new Markup(
+                    $"[{Theme.Primary}]{Theme.Bullet}[/] [{Theme.Primary}]+ {extra} more playlist(s)[/]"
+                )
+            );
+        }
+
+        return new Panel(new Rows(rows))
+        {
+            Header = new PanelHeader($"Queue ({count} ready to merge)"),
+            Border = BoxBorder.Rounded,
+            BorderStyle = new Style(Theme.PrimaryColor),
+            Padding = new Padding(2, 0),
+            Expand = false,
+        };
+    }
+
+    internal static Markup RenderLogArea(LogBuffer logs, int width, int height)
     {
         var visible = logs.GetVisible(height);
         var lines = new List<string>(height);
@@ -113,7 +184,7 @@ internal static class Components
         return new Markup(string.Join('\n', lines));
     }
 
-    internal static IRenderable RenderProgressBar(string label, double percent, int width)
+    internal static Markup RenderProgressBar(string label, double percent, int width)
     {
         var barWidth = Math.Max(10, width - 10);
         var filled = (int)(barWidth * Math.Clamp(percent, 0, 1));
@@ -129,14 +200,14 @@ internal static class Components
         );
     }
 
-    internal static IRenderable RenderSpinnerLine(string label, int spinnerTick)
+    internal static Markup RenderSpinnerLine(string label, int spinnerTick)
     {
         var frame = Theme.SpinnerFrames[spinnerTick % Theme.SpinnerFrames.Length];
         return new Markup($"[{Theme.Primary}]{frame}[/] [{Theme.Teal}]{Markup.Escape(label)}[/]");
     }
 
-    internal static IRenderable RenderConfirmPrompt(int count) =>
-        new Markup(
+    internal static Markup RenderConfirmPrompt(int count) =>
+        new(
             $"[{Theme.White} bold]"
                 + $"Try text matching for {count} remaining track(s)? (can be slow) [[Y/n]] [/]"
         );
@@ -165,7 +236,7 @@ internal static class Components
         };
     }
 
-    internal static IRenderable RenderResultsTable(
+    internal static Table RenderResultsTable(
         List<MatchResult> allResults,
         int scrollOffset,
         int visibleRows,
@@ -193,33 +264,16 @@ internal static class Components
 
         for (var i = start; i < end; i++)
         {
-            var r = allResults[i];
-            var trackLabel = Markup.Escape(
-                Truncate($"{r.SpotifyTrack.Artist} - {r.SpotifyTrack.Title}", trackWidth)
-            );
+            var result = allResults[i];
+            var trackLabel = BuildTrackLabel(result, trackWidth);
 
-            switch (r)
+            switch (result)
             {
                 case MatchResult.Matched m:
-                    var detail = m.Method is MatchMethod.Isrc ? "ISRC" : $"Text {m.Confidence:F2}";
-                    table.AddRow(
-                        $"{i + 1}",
-                        trackLabel,
-                        $"[{Theme.Gray}]{Markup.Escape(Truncate(detail, statusWidth))}[/]"
-                    );
+                    AddMatchedRow(table, i, trackLabel, m);
                     break;
                 case MatchResult.NotFound nf:
-                    var reason = nf.Reason.StartsWith(
-                        MatchResult.NotFound.BelowThresholdPrefix,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                        ? $"Below threshold{nf.Reason[MatchResult.NotFound.BelowThresholdPrefix.Length..]}"
-                        : nf.Reason;
-                    table.AddRow(
-                        $"{i + 1}",
-                        trackLabel,
-                        $"[{Theme.Red}]{Markup.Escape(Truncate(reason, statusWidth))}[/]"
-                    );
+                    AddNotFoundRow(table, i, trackLabel, nf, statusWidth);
                     break;
             }
         }
@@ -227,12 +281,56 @@ internal static class Components
         return table;
     }
 
-    internal static IRenderable RenderSummaryPanel(
-        string name,
-        int matched,
-        int total,
-        int notFound
+    private static string BuildTrackLabel(MatchResult result, int trackWidth) =>
+        Markup.Escape(
+            Truncate($"{result.SpotifyTrack.Artist} - {result.SpotifyTrack.Title}", trackWidth)
+        );
+
+    private static void AddMatchedRow(
+        Table table,
+        int index,
+        string trackLabel,
+        MatchResult.Matched match
     )
+    {
+        var detail = RenderMatchedStatus(match);
+        table.AddRow(
+            $"[{Theme.Gray}]{index + 1}[/]",
+            trackLabel,
+            $"{Theme.LogPrefixSuccess}{detail}"
+        );
+    }
+
+    private static void AddNotFoundRow(
+        Table table,
+        int index,
+        string trackLabel,
+        MatchResult.NotFound notFound,
+        int statusWidth
+    )
+    {
+        var reason = NormalizeNotFoundReason(notFound.Reason);
+        table.AddRow(
+            $"[{Theme.Muted}]{index + 1}[/]",
+            $"[{Theme.Red}]{trackLabel}[/]",
+            $"{Theme.LogPrefixError}[{Theme.Red}]{Markup.Escape(Truncate(reason, statusWidth))}[/]"
+        );
+    }
+
+    private static string RenderMatchedStatus(MatchResult.Matched match) =>
+        match.Method is MatchMethod.Isrc
+            ? $"[{Theme.Primary}]ISRC[/]"
+            : $"[{Theme.Teal}]Text ({(int)(match.Confidence * 100)}%)[/]";
+
+    private static string NormalizeNotFoundReason(string reason) =>
+        reason.StartsWith(
+            MatchResult.NotFound.BelowThresholdPrefix,
+            StringComparison.OrdinalIgnoreCase
+        )
+            ? $"Below threshold{reason[MatchResult.NotFound.BelowThresholdPrefix.Length..]}"
+            : reason;
+
+    internal static Panel RenderSummaryPanel(string name, int matched, int total, int notFound)
     {
         var success = matched > 0;
         var content =
@@ -251,7 +349,7 @@ internal static class Components
         };
     }
 
-    internal static IRenderable RenderHelpTable()
+    internal static Table RenderHelpTable()
     {
         var table = new Table();
         table.Border(TableBorder.Rounded);
@@ -287,23 +385,41 @@ internal static class Components
         return table;
     }
 
-    internal static IRenderable RenderFooter() =>
-        new Markup(
-            $"[{Theme.Muted}]Commands: /help /auth /add /run /status /storefront <code> /name <name> /quit[/]"
-        );
+    internal static Markup RenderContextualFooter(
+        TuiTransferPhase phase,
+        bool awaitingUserToken,
+        bool showHelp
+    )
+    {
+        if (showHelp)
+            return new Markup(
+                $"[{Theme.Primary}]Enter[/] hide help  [{Theme.Primary}]Ctrl+C[/] quit"
+            );
 
-    internal static IRenderable RenderConfirmationFooter(TuiTransferPhase phase) =>
-        phase switch
+        if (awaitingUserToken)
+            return new Markup(
+                $"[{Theme.Primary}]Enter[/] submit token  [{Theme.Muted}]Esc[/] cancel  [{Theme.Muted}]Ctrl+C[/] quit"
+            );
+
+        return phase switch
         {
+            TuiTransferPhase.Idle => new Markup(
+                $"[{Theme.Primary}]Enter[/] submit  [{Theme.Muted}]/help[/] commands  [{Theme.Muted}]Ctrl+C[/] quit"
+            ),
+            TuiTransferPhase.ConfirmPlaylist => new Markup(
+                $"[{Theme.Primary}]Enter/Y[/] proceed  [{Theme.Muted}]Esc/N[/] cancel  [{Theme.Muted}]Ctrl+C[/] quit"
+            ),
             TuiTransferPhase.ConfirmTextMatch => new Markup(
-                $"[{Theme.Primary}]Enter/Y[/] start matching  [{Theme.Muted}]N[/] skip  [{Theme.Muted}]Ctrl+C[/] quit"
+                $"[{Theme.Primary}]Enter/Y[/] match text  [{Theme.Muted}]N[/] skip  [{Theme.Muted}]Ctrl+C[/] quit"
             ),
-            _ => new Markup(
-                $"[{Theme.Primary}]Enter[/] start transfer  [{Theme.Muted}]Esc[/] back  [{Theme.Muted}]Ctrl+C[/] quit"
+            TuiTransferPhase.Done => new Markup(
+                $"[{Theme.Primary}]Up/Down[/] scroll  [{Theme.Primary}]Enter[/] new transfer  [{Theme.Muted}]Ctrl+C[/] quit"
             ),
+            _ => new Markup($"[{Theme.Muted}]Working...[/]  [{Theme.Muted}]Ctrl+C[/] quit"),
         };
+    }
 
-    internal static IRenderable RenderScrollHint(int offset, int total, int visible)
+    internal static Markup RenderScrollHint(int offset, int total, int visible)
     {
         var posInfo =
             total > visible
@@ -314,11 +430,7 @@ internal static class Components
         );
     }
 
-    internal static IRenderable RenderPlaylistConfirmation(
-        string name,
-        int trackCount,
-        string storefront
-    )
+    internal static Panel RenderPlaylistConfirmation(string name, int trackCount, string storefront)
     {
         var safeName = string.IsNullOrWhiteSpace(name) ? "Spotify Import" : name.Trim();
         var tracksLabel = trackCount == 1 ? "1 track" : $"{trackCount} tracks";
@@ -345,7 +457,11 @@ internal static class Components
         );
 
         return new Panel(
-            new Rows(new Markup($"[{Theme.White} bold]Playlist preview[/]"), new Text(""), grid)
+            new Rows(
+                new Markup($"[{Theme.White} bold]Playlist preview[/]"),
+                new Text(string.Empty),
+                grid
+            )
         )
         {
             Border = BoxBorder.Rounded,
