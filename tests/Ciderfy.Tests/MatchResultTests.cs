@@ -9,7 +9,7 @@ public class MatchResultTests
     [Fact]
     public void Matched_StoresAllProperties()
     {
-        var spotify = SpotifyTrackFaker.Default.Generate();
+        var spotify = TrackMetadataFaker.Default.Generate();
         var apple = AppleTrackFaker.Default.Generate();
 
         var result = new MatchResult.Matched(spotify, apple, MatchMethod.Isrc, 0.95);
@@ -23,7 +23,7 @@ public class MatchResultTests
     [Fact]
     public void NotFound_StoresAllProperties()
     {
-        var spotify = SpotifyTrackFaker.Default.Generate();
+        var spotify = TrackMetadataFaker.Default.Generate();
         const string reason = "no match found";
 
         var result = new MatchResult.NotFound(spotify, reason);

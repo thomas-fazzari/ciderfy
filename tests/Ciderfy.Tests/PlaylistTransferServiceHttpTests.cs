@@ -72,7 +72,7 @@ public class PlaylistTransferServiceHttpTests
     [Fact]
     public async Task MatchByIsrcAsync_AllTracksHaveIsrc_ReturnsMatchedResults()
     {
-        var track = SpotifyTrackFaker
+        var track = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Fortunate Son")
             .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
@@ -99,7 +99,7 @@ public class PlaylistTransferServiceHttpTests
 
         var sut = CreateSut(FakeHttpMessageHandler.ThrowOnCall(), amHttp, deezerHttp);
         var (matched, unmatched) = await sut.MatchByIsrcAsync(
-            [SpotifyTrackFaker.Default.Generate()],
+            [TrackMetadataFaker.Default.Generate()],
             "us",
             ct: Ct
         );
@@ -111,7 +111,7 @@ public class PlaylistTransferServiceHttpTests
     [Fact]
     public async Task MatchByTextAsync_CandidateFound_ReturnsMatched()
     {
-        var track = SpotifyTrackFaker
+        var track = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Fortunate Son")
             .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
@@ -133,7 +133,7 @@ public class PlaylistTransferServiceHttpTests
         using var amHttp = FakeHttpMessageHandler.ReturningJson(AmNoResults);
 
         var results = await SutWithAmOnly(amHttp)
-            .MatchByTextAsync([SpotifyTrackFaker.Default.Generate()], "us", ct: Ct);
+            .MatchByTextAsync([TrackMetadataFaker.Default.Generate()], "us", ct: Ct);
 
         Assert.IsType<MatchResult.NotFound>(Assert.Single(results));
     }
@@ -148,7 +148,7 @@ public class PlaylistTransferServiceHttpTests
                 "My Playlist",
                 [
                     new MatchResult.Matched(
-                        SpotifyTrackFaker.Default.Generate(),
+                        TrackMetadataFaker.Default.Generate(),
                         AppleTrackFaker.Default.Generate(),
                         MatchMethod.Isrc,
                         1.0
@@ -165,7 +165,7 @@ public class PlaylistTransferServiceHttpTests
     public async Task CreatePlaylistAsync_Success_ReturnsPlaylistIdAndTrue()
     {
         var matched = new MatchResult.Matched(
-            SpotifyTrackFaker.Default.Generate(),
+            TrackMetadataFaker.Default.Generate(),
             AppleTrackFaker.Default.Clone().RuleFor(t => t.Id, "am-track-1").Generate(),
             MatchMethod.Isrc,
             1.0

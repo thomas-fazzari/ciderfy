@@ -3,7 +3,6 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Ciderfy.Matching;
 using Ciderfy.Web;
 using OtpNet;
 
@@ -161,9 +160,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         using var request = new HttpRequestMessage(HttpMethod.Post, ClientTokenEndpoint);
         request.Content = new StringContent(payload, Encoding.UTF8);
         request.Content.Headers.ContentType = new MediaTypeHeaderValue(MimeTypes.Json);
-        request.Headers.Add("Authority", ClientTokenAuthority);
-        request.Headers.Add("Accept", MimeTypes.Json);
-        request.Headers.Add("User-Agent", UserAgent);
+        request.Headers.Add(HttpHeaderNames.Authority, ClientTokenAuthority);
+        request.Headers.Add(HttpHeaderNames.Accept, MimeTypes.Json);
+        request.Headers.Add(HttpHeaderNames.UserAgent, UserAgent);
 
         using var response = await _httpClient.SendAsync(request, ct);
         response.EnsureSuccessStatusCode();
@@ -239,7 +238,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
 
     internal static SpotifyPlaylist ParsePlaylistResponse(JsonDocument doc)
     {
-        var tracks = new List<TrackMetadata>();
+        var tracks = new List<SpotifyTrack>();
 
         if (
             !doc.RootElement.TryGetProperty("data", out var data)
@@ -267,7 +266,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         return new SpotifyPlaylist(name, tracks);
     }
 
-    internal static TrackMetadata? ParsePlaylistItem(JsonElement item)
+    internal static SpotifyTrack? ParsePlaylistItem(JsonElement item)
     {
         if (
             !item.TryGetProperty("itemV2", out var itemV2)
@@ -279,7 +278,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         if (string.IsNullOrWhiteSpace(title))
             return null;
 
-        return new TrackMetadata
+        return new SpotifyTrack
         {
             SpotifyId = ExtractIdFromUri(itemData),
             Title = title,

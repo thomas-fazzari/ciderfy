@@ -30,7 +30,7 @@ internal static class PlaylistFaker
         });
 
     public static (SpotifyPlaylist P1, SpotifyPlaylist P2) WithSharedTracks(
-        IReadOnlyList<TrackMetadata> sharedTracks,
+        IReadOnlyList<SpotifyTrack> sharedTracks,
         int exclusivePerPlaylist = 2
     )
     {

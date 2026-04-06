@@ -47,7 +47,7 @@ public class TrackMatcherHttpTests
             """;
 
         using var http = FakeHttpMessageHandler.ReturningJson(searchJson);
-        var track = SpotifyTrackFaker
+        var track = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Fortunate Son")
             .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
@@ -64,7 +64,7 @@ public class TrackMatcherHttpTests
         var emptyJson = """{"results":{"songs":{"data":[]}}}""";
 
         using var http = FakeHttpMessageHandler.ReturningJson(emptyJson);
-        var track = SpotifyTrackFaker
+        var track = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Revolution 909")
             .RuleFor(t => t.Artist, "Daft Punk")

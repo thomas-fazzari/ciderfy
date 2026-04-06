@@ -49,17 +49,6 @@ public class PlaylistMergerTests
     }
 
     [Fact]
-    public void MergeTracks_PreservesIsrc()
-    {
-        var track = SpotifyTrackFaker.WithIsrc.Generate();
-
-        var result = PlaylistMerger.MergeTracks([new SpotifyPlaylist("P", [track])]);
-
-        Assert.Equal(track.Isrc, result[0].Isrc);
-        Assert.NotNull(result[0].Isrc);
-    }
-
-    [Fact]
     public void ResolveName_UserOverride_ReturnsOverride()
     {
         var playlists = PlaylistFaker.Default.Generate(2);

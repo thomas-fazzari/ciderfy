@@ -24,7 +24,6 @@ internal static class PlaylistMerger
                     Title = t.Title,
                     Artist = t.Artist,
                     DurationMs = t.DurationMs,
-                    Isrc = t.Isrc,
                 }),
         ];
 

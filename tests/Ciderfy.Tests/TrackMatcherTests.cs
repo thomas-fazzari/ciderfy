@@ -115,7 +115,7 @@ public class TrackMatcherTests
     [Fact]
     public void CalculateSimilarity_DifferentTracks_ReturnsBelowThreshold()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Revolution 909")
             .RuleFor(t => t.Artist, "Daft Punk")
@@ -133,7 +133,7 @@ public class TrackMatcherTests
     [Fact]
     public void CalculateSimilarity_SameSongDifferentVersions_AboveThreshold()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Fortunate Son - Remastered 2014")
             .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
@@ -151,7 +151,7 @@ public class TrackMatcherTests
     [Fact]
     public void CalculateSimilarity_SameArtistDifferentSong_BelowThreshold()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Purple Haze")
             .RuleFor(t => t.Artist, "Jimi Hendrix")
@@ -169,7 +169,7 @@ public class TrackMatcherTests
     [Fact]
     public void CalculateSimilarity_ThePrefix_StillMatches()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "House of the Rising Sun")
             .RuleFor(t => t.Artist, "The Animals")
@@ -187,7 +187,7 @@ public class TrackMatcherTests
     [Fact]
     public void CalculateSimilarity_AmpersandVsAnd_StillMatches()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "The Sound of Silence")
             .RuleFor(t => t.Artist, "Simon & Garfunkel")
@@ -205,7 +205,7 @@ public class TrackMatcherTests
     [Fact]
     public void CalculateSimilarity_SlashTitle_StillMatches()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "War Pigs")
             .RuleFor(t => t.Artist, "Black Sabbath")
@@ -223,7 +223,7 @@ public class TrackMatcherTests
     [Fact]
     public void CalculateSimilarity_FeatInTitle_StillMatches()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Something feat. George Harrison")
             .RuleFor(t => t.Artist, "The Beatles")
@@ -242,7 +242,7 @@ public class TrackMatcherTests
     public void CalculateSimilarity_VietnamWarPlaylistEdgeCases()
     {
         // Apostrophe normalization
-        var spotify1 = SpotifyTrackFaker
+        var spotify1 = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "We've Gotta Get out of This Place")
             .RuleFor(t => t.Artist, "The Animals")
@@ -257,7 +257,7 @@ public class TrackMatcherTests
         Assert.True(result1 >= 0.7, $"Expected >= 0.7 but got {result1}");
 
         // With remaster suffix
-        var spotify2 = SpotifyTrackFaker
+        var spotify2 = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Green Grass & High Tides - Remastered")
             .RuleFor(t => t.Artist, "The Outlaws")
@@ -290,7 +290,7 @@ public class TrackMatcherTests
     [Fact]
     public void CalculateSimilarity_IdenticalSong_LargeDurationDiff_PenalizesScore()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .WithDuration(240_000)
             .RuleFor(t => t.Title, "Song A")
             .RuleFor(t => t.Artist, "Artist A")
@@ -310,7 +310,7 @@ public class TrackMatcherTests
     public void CalculateSimilarity_ModerateDurationDiff_CanDropBelowThreshold()
     {
         // Borderline text match with a duration difference that should drop below 0.7
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .WithDuration(200_000)
             .RuleFor(t => t.Title, "War Pigs")
             .RuleFor(t => t.Artist, "Black Sabbath")
@@ -323,7 +323,7 @@ public class TrackMatcherTests
             .Generate();
 
         var textOnly = TrackMatcher.CalculateSimilarity(
-            SpotifyTrackFaker
+            TrackMetadataFaker
                 .Default.Clone()
                 .RuleFor(t => t.Title, "War Pigs")
                 .RuleFor(t => t.Artist, "Black Sabbath")
@@ -342,7 +342,7 @@ public class TrackMatcherTests
     [Fact]
     public void FindBestMatch_EmptyCandidates_ReturnsNull()
     {
-        var spotify = SpotifyTrackFaker.Default.Generate();
+        var spotify = TrackMetadataFaker.Default.Generate();
 
         var result = TrackMatcher.FindBestMatch(spotify, []);
 
@@ -352,7 +352,7 @@ public class TrackMatcherTests
     [Fact]
     public void FindBestMatch_AllBelowThreshold_ReturnsNull()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Revolution 909")
             .RuleFor(t => t.Artist, "Daft Punk")
@@ -380,7 +380,7 @@ public class TrackMatcherTests
     [Fact]
     public void FindBestMatch_OneAboveThreshold_ReturnsThatMatch()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Fortunate Son")
             .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
@@ -411,7 +411,7 @@ public class TrackMatcherTests
     [Fact]
     public void FindBestMatch_MultipleAboveThreshold_ReturnsBestScore()
     {
-        var spotify = SpotifyTrackFaker
+        var spotify = TrackMetadataFaker
             .Default.Clone()
             .RuleFor(t => t.Title, "Fortunate Son")
             .RuleFor(t => t.Artist, "Creedence Clearwater Revival")

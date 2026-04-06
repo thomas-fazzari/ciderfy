@@ -13,7 +13,7 @@ public class DeezerIsrcResolverHttpTests
         new DeezerClientOptions { RateLimitDelayMs = 1 }
     );
 
-    private static readonly TrackMetadata _track = SpotifyTrackFaker.Default.Generate();
+    private static readonly TrackMetadata _track = TrackMetadataFaker.Default.Generate();
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
