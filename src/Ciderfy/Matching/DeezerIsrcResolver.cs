@@ -69,7 +69,7 @@ internal sealed class DeezerIsrcResolver(
             return null;
 
         var response = JsonSerializer.Deserialize<DeezerSearchResponse>(json);
-        return response?.Data?.FirstOrDefault()?.Isrc;
+        return response?.Data is { Count: > 0 } data ? data[0].Isrc : null;
     }
 
     private async Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct)
