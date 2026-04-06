@@ -28,15 +28,15 @@ internal sealed partial class TuiApp
         _commands.Register(HandleRunCommand, "/run");
     }
 
-    private void HandleQuitCommand(string? _)
+    private void HandleQuitCommand() => RequestQuit();
+
+    private void HandleHelpCommand()
     {
-        _state.QuitRequested = true;
-        _cts.Cancel();
+        _state.ShowHelp = !_state.ShowHelp;
+        _state.ScrollOffset = 0;
     }
 
-    private void HandleHelpCommand(string? _) => _state.ShowHelp = !_state.ShowHelp;
-
-    private void HandleStatusCommand(string? _) => _logs.Append(LogKind.Info, StatusSummary());
+    private void HandleStatusCommand() => _logs.Append(LogKind.Info, StatusSummary());
 
     private void HandleStorefrontCommand(string? argument)
     {
@@ -117,7 +117,7 @@ internal sealed partial class TuiApp
         }
     }
 
-    private void HandleRunCommand(string? argument)
+    private void HandleRunCommand()
     {
         if (_state.QueuedPlaylistUrls.Count == 0)
         {
@@ -135,6 +135,6 @@ internal sealed partial class TuiApp
             LogKind.Info,
             $"Starting transfer of {playlistIdsToFetch.Count} merged playlists..."
         );
-        _ = Task.Run(() => RunFetchPlaylistAsync(playlistIdsToFetch, _cts.Token));
+        Task.Run(() => RunFetchPlaylistAsync(playlistIdsToFetch, _cts.Token));
     }
 }

@@ -15,19 +15,40 @@ internal sealed partial class TuiApp
             if (HandleQuitShortcut(key))
                 return;
 
-            if (TryHandlePlaylistConfirmInput(key))
-                continue;
-
-            if (TryHandleConfirmPhaseInput(key))
-                continue;
-
-            if (TryHandleDonePhaseInput(key))
-                continue;
-
-            if (!CanAcceptGeneralInput())
+            if (TryHandlePhaseInput(key) || !CanAcceptGeneralInput())
                 continue;
 
             HandleGeneralInput(key);
+        }
+    }
+
+    private bool TryHandlePhaseInput(ConsoleKeyInfo key) =>
+        _state.ShowHelp && _state.Phase is TuiTransferPhase.Idle
+            ? TryHandleHelpInput(key)
+            : _state.Phase switch
+            {
+                TuiTransferPhase.ConfirmPlaylist => TryHandlePlaylistConfirmInput(key),
+                TuiTransferPhase.ConfirmTextMatch => TryHandleConfirmPhaseInput(key),
+                TuiTransferPhase.Done => TryHandleDonePhaseInput(key),
+                _ => false,
+            };
+
+    private bool TryHandleHelpInput(ConsoleKeyInfo key)
+    {
+        switch (key.Key)
+        {
+            case ConsoleKey.UpArrow:
+                ScrollOffsetUp();
+                return true;
+            case ConsoleKey.DownArrow:
+                ScrollHelpDown();
+                return true;
+            case ConsoleKey.Enter:
+                _state.ShowHelp = false;
+                _state.ScrollOffset = 0;
+                return true;
+            default:
+                return true;
         }
     }
 
@@ -49,16 +70,12 @@ internal sealed partial class TuiApp
         if (key is not { Key: ConsoleKey.C, Modifiers: ConsoleModifiers.Control })
             return false;
 
-        _state.QuitRequested = true;
-        _cts.Cancel();
+        RequestQuit();
         return true;
     }
 
     private bool TryHandlePlaylistConfirmInput(ConsoleKeyInfo key)
     {
-        if (_state.Phase is not TuiTransferPhase.ConfirmPlaylist)
-            return false;
-
         if (key.Key is ConsoleKey.Enter)
         {
             _state.Phase = TuiTransferPhase.ResolvingIsrc;
@@ -78,22 +95,16 @@ internal sealed partial class TuiApp
 
     private bool TryHandleConfirmPhaseInput(ConsoleKeyInfo key)
     {
-        if (_state.Phase is not TuiTransferPhase.ConfirmTextMatch)
-            return false;
-
         HandleConfirmKey(key);
         return true;
     }
 
     private bool TryHandleDonePhaseInput(ConsoleKeyInfo key)
     {
-        if (_state.Phase is not TuiTransferPhase.Done)
-            return false;
-
         switch (key.Key)
         {
             case ConsoleKey.UpArrow:
-                ScrollResultsUp();
+                ScrollOffsetUp();
                 return true;
             case ConsoleKey.DownArrow:
                 ScrollResultsDown();
@@ -106,19 +117,25 @@ internal sealed partial class TuiApp
         }
     }
 
-    private void ScrollResultsUp() => _state.ScrollOffset = Math.Max(0, _state.ScrollOffset - 1);
+    private void ScrollOffsetUp() => _state.ScrollOffset = Math.Max(0, _state.ScrollOffset - 1);
+
+    private void ScrollHelpDown()
+    {
+        ScrollOffsetDown(Components.HelpEntryCount, GetVisibleHelpRows());
+    }
 
     private void ScrollResultsDown()
     {
         if (_state.AllResults is null)
             return;
 
-        var visibleRows = Math.Max(
-            3,
-            Console.WindowHeight - CurrentFixedChromeHeight - DoneViewChromeHeight
-        );
+        ScrollOffsetDown(_state.AllResults.Count, GetVisibleDoneRows());
+    }
+
+    private void ScrollOffsetDown(int totalCount, int visibleRows)
+    {
         _state.ScrollOffset = Math.Min(
-            Math.Max(0, _state.AllResults.Count - visibleRows),
+            Math.Max(0, totalCount - visibleRows),
             _state.ScrollOffset + 1
         );
     }
@@ -187,17 +204,19 @@ internal sealed partial class TuiApp
     {
         _state.ShowHelp = false;
 
-        var raw = _inputBuffer.ToString().Trim();
+        var raw = _inputBuffer.ToString();
         _inputBuffer.Clear();
-
-        if (string.IsNullOrEmpty(raw))
-            return;
 
         if (_state.AwaitingUserToken)
         {
             HandleUserTokenInput(raw);
             return;
         }
+
+        raw = raw.Trim();
+
+        if (string.IsNullOrEmpty(raw))
+            return;
 
         if (raw.StartsWith('/'))
         {

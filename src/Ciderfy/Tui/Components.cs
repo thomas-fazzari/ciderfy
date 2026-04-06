@@ -10,6 +10,9 @@ namespace Ciderfy.Tui;
 internal static class Components
 {
     internal const int MaxVisibleQueuedPlaylists = 3;
+    private const int CompactBannerHeight = 1;
+    private const int FullBannerHeight = 6;
+    private const int MinFullBannerWidth = 72;
 
     private static readonly string[] _bannerLines =
     [
@@ -21,14 +24,50 @@ internal static class Components
         " ╚═════╝╚═╝╚═════╝ ╚══════╝╚═╝  ╚═╝╚═╝        ╚═╝   ",
     ];
 
+    private static readonly string[] _normalizedBannerLines =
+    [
+        .. _bannerLines.Select(static line => line.TrimEnd()),
+    ];
+
+    private static readonly int _bannerWidth = _normalizedBannerLines.Max(static line =>
+        line.Length
+    );
+
     private static readonly string[] _stepLabels = ["Setup", "Fetch", "Match", "Transfer", "Done"];
+
+    private static readonly (string Command, string Description)[] _helpEntries =
+    [
+        ($"[{Theme.Primary}]/auth[/]", "Authenticate with Apple Music"),
+        ($"[{Theme.Primary}]/auth reset[/]", "Clear cached tokens and re-authenticate"),
+        ($"[{Theme.Primary}]/status[/]", "Show authentication status"),
+        (
+            $"[{Theme.Primary}]/storefront[/] [{Theme.Muted}]<code>[/]",
+            "Set Apple Music storefront (default: us)"
+        ),
+        (
+            $"[{Theme.Primary}]/name[/] [{Theme.Muted}]<name>[/]",
+            "Set playlist name for next transfer"
+        ),
+        ($"[{Theme.Primary}]/name[/]", "Clear playlist name override"),
+        (
+            $"[{Theme.Primary}]/add[/] [{Theme.Muted}]<url>[/]",
+            "Queue a Spotify playlist to merge multiple"
+        ),
+        ($"[{Theme.Primary}]/run[/]", "Start transferring the queued playlists"),
+        ($"[{Theme.Primary}]/help[/]", "Show this help"),
+        ($"[{Theme.Primary}]/quit[/]", "Exit"),
+        (string.Empty, string.Empty),
+        ($"[{Theme.Primary}]<spotify-url>[/]", "Paste a Spotify playlist URL to transfer directly"),
+    ];
+
+    internal static int HelpEntryCount => _helpEntries.Length;
+
+    internal static int GetBannerHeight(int width) =>
+        ShouldUseCompactBanner(width) ? CompactBannerHeight : FullBannerHeight;
 
     internal static IRenderable RenderBanner(int width)
     {
-        var normalizedLines = _bannerLines.Select(static line => line.TrimEnd()).ToArray();
-        var bannerWidth = normalizedLines.Max(static line => line.Length);
-
-        if (width < bannerWidth)
+        if (ShouldUseCompactBanner(width))
         {
             const string compactBanner = "CIDERFY";
             var compactPadding = Math.Max(0, (width - compactBanner.Length) / 2);
@@ -37,18 +76,24 @@ internal static class Components
             );
         }
 
-        var leftPadding = Math.Max(0, (width - bannerWidth) / 2);
-        var rows = new List<IRenderable>(normalizedLines.Length);
+        var leftPadding = Math.Max(0, (width - _bannerWidth) / 2);
+        var rows = new List<IRenderable>(_normalizedBannerLines.Length);
 
-        for (var i = 0; i < normalizedLines.Length; i++)
+        for (var i = 0; i < _normalizedBannerLines.Length; i++)
         {
             var bold = i is 2 or 3 ? " bold" : string.Empty;
-            var centeredLine = string.Concat(new string(' ', leftPadding), normalizedLines[i]);
+            var centeredLine = string.Concat(
+                new string(' ', leftPadding),
+                _normalizedBannerLines[i]
+            );
             rows.Add(new Markup($"[{Theme.Primary}{bold}]{Markup.Escape(centeredLine)}[/]"));
         }
 
         return new Rows(rows);
     }
+
+    private static bool ShouldUseCompactBanner(int width) =>
+        width < Math.Max(_bannerWidth, MinFullBannerWidth);
 
     internal static Align RenderStatusBadges(
         bool hasValidDeveloperToken,
@@ -349,7 +394,7 @@ internal static class Components
         };
     }
 
-    internal static Table RenderHelpTable()
+    internal static Table RenderHelpTable(int scrollOffset, int visibleRows)
     {
         var table = new Table();
         table.Border(TableBorder.Rounded);
@@ -357,49 +402,66 @@ internal static class Components
         table.AddColumn(new TableColumn($"[bold]Command[/]").NoWrap());
         table.AddColumn(new TableColumn("[bold]Description[/]"));
 
-        table.AddRow($"[{Theme.Primary}]/auth[/]", "Authenticate with Apple Music");
-        table.AddRow($"[{Theme.Primary}]/auth reset[/]", "Clear cached tokens and re-authenticate");
-        table.AddRow($"[{Theme.Primary}]/status[/]", "Show authentication status");
-        table.AddRow(
-            $"[{Theme.Primary}]/storefront[/] [{Theme.Muted}]<code>[/]",
-            "Set Apple Music storefront (default: us)"
+        var start = Math.Max(
+            0,
+            Math.Min(scrollOffset, Math.Max(0, _helpEntries.Length - visibleRows))
         );
-        table.AddRow(
-            $"[{Theme.Primary}]/name[/] [{Theme.Muted}]<name>[/]",
-            "Set playlist name for next transfer"
-        );
-        table.AddRow($"[{Theme.Primary}]/name[/]", "Clear playlist name override");
-        table.AddRow(
-            $"[{Theme.Primary}]/add[/] [{Theme.Muted}]<url>[/]",
-            "Queue a Spotify playlist to merge multiple"
-        );
-        table.AddRow($"[{Theme.Primary}]/run[/]", "Start transferring the queued playlists");
-        table.AddRow($"[{Theme.Primary}]/help[/]", "Show this help");
-        table.AddRow($"[{Theme.Primary}]/quit[/]", "Exit");
-        table.AddRow(string.Empty, string.Empty);
-        table.AddRow(
-            $"[{Theme.Primary}]<spotify-url>[/]",
-            "Paste a Spotify playlist URL to transfer directly"
-        );
+        var end = Math.Min(_helpEntries.Length, start + visibleRows);
+
+        for (var i = start; i < end; i++)
+        {
+            var entry = _helpEntries[i];
+            table.AddRow(entry.Command, entry.Description);
+        }
 
         return table;
+    }
+
+    internal static Markup RenderHelpScrollHint(int offset, int total, int visible)
+    {
+        if (total <= visible)
+            return new Markup(string.Empty);
+
+        return new Markup(
+            $"[{Theme.Muted}]{Theme.ArrowUp}/{Theme.ArrowDown} scroll[/]{BuildScrollPositionInfo(offset, total, visible)}"
+        );
     }
 
     internal static Markup RenderContextualFooter(
         TuiTransferPhase phase,
         bool awaitingUserToken,
-        bool showHelp
+        bool showHelp,
+        bool showScrollActions
     )
     {
         if (showHelp)
+        {
+            if (showScrollActions)
+                return new Markup(
+                    $"[{Theme.Primary}]Up/Down[/] scroll  [{Theme.Primary}]Enter[/] hide help  [{Theme.Primary}]Ctrl+C[/] quit"
+                );
+
             return new Markup(
                 $"[{Theme.Primary}]Enter[/] hide help  [{Theme.Primary}]Ctrl+C[/] quit"
             );
+        }
 
         if (awaitingUserToken)
             return new Markup(
                 $"[{Theme.Primary}]Enter[/] submit token  [{Theme.Muted}]Esc[/] cancel  [{Theme.Muted}]Ctrl+C[/] quit"
             );
+
+        if (phase is TuiTransferPhase.Done)
+        {
+            if (showScrollActions)
+                return new Markup(
+                    $"[{Theme.Primary}]Up/Down[/] scroll  [{Theme.Primary}]Enter[/] new transfer  [{Theme.Muted}]Ctrl+C[/] quit"
+                );
+
+            return new Markup(
+                $"[{Theme.Primary}]Enter[/] new transfer  [{Theme.Muted}]Ctrl+C[/] quit"
+            );
+        }
 
         return phase switch
         {
@@ -412,23 +474,22 @@ internal static class Components
             TuiTransferPhase.ConfirmTextMatch => new Markup(
                 $"[{Theme.Primary}]Enter/Y[/] match text  [{Theme.Muted}]N[/] skip  [{Theme.Muted}]Ctrl+C[/] quit"
             ),
-            TuiTransferPhase.Done => new Markup(
-                $"[{Theme.Primary}]Up/Down[/] scroll  [{Theme.Primary}]Enter[/] new transfer  [{Theme.Muted}]Ctrl+C[/] quit"
-            ),
             _ => new Markup($"[{Theme.Muted}]Working...[/]  [{Theme.Muted}]Ctrl+C[/] quit"),
         };
     }
 
     internal static Markup RenderScrollHint(int offset, int total, int visible)
     {
-        var posInfo =
-            total > visible
-                ? $"  [{Theme.Muted}]({offset + 1}-{Math.Min(offset + visible, total)}/{total})[/]"
-                : string.Empty;
+        if (total <= visible)
+            return new Markup($"[{Theme.Muted}]Press Enter to start a new transfer[/]");
+
         return new Markup(
-            $"[{Theme.Muted}]{Theme.ArrowUp}/{Theme.ArrowDown} scroll[/]{posInfo}[{Theme.Muted}]  {Theme.Bullet}  Press Enter to start a new transfer[/]"
+            $"[{Theme.Muted}]{Theme.ArrowUp}/{Theme.ArrowDown} scroll[/]{BuildScrollPositionInfo(offset, total, visible)}[{Theme.Muted}]  {Theme.Bullet}  Press Enter to start a new transfer[/]"
         );
     }
+
+    private static string BuildScrollPositionInfo(int offset, int total, int visible) =>
+        $"  [{Theme.Muted}]({offset + 1}-{Math.Min(offset + visible, total)}/{total})[/]";
 
     internal static Panel RenderPlaylistConfirmation(string name, int trackCount, string storefront)
     {

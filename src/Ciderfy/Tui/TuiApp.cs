@@ -30,10 +30,18 @@ internal sealed partial class TuiApp(
         EnsureCommandsRegistered();
         _logs.Append(LogKind.Info, "Paste a Spotify playlist URL to transfer, or type /help");
 
+        Console.CancelKeyPress += OnCancelKeyPress;
         _ = RunTickTimerAsync(_cts.Token);
 
-        RunUiLoop();
-        return Task.FromResult(0);
+        try
+        {
+            RunUiLoop();
+            return Task.FromResult(0);
+        }
+        finally
+        {
+            Console.CancelKeyPress -= OnCancelKeyPress;
+        }
     }
 
     private void RunUiLoop()
@@ -79,6 +87,18 @@ internal sealed partial class TuiApp(
     }
 
     private bool ShouldContinueRunning() => !_state.QuitRequested && !_cts.IsCancellationRequested;
+
+    private void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
+    {
+        e.Cancel = true;
+        RequestQuit();
+    }
+
+    private void RequestQuit()
+    {
+        _state.QuitRequested = true;
+        _cts.Cancel();
+    }
 
     private void DrainPendingMessages()
     {

@@ -6,14 +6,13 @@ namespace Ciderfy.Tui;
 
 internal sealed partial class TuiApp
 {
+    private const int MinStatusSectionWidth = 64;
     private const int MinWindowWidth = 24;
     private const int ContentHorizontalPadding = 4;
     private const int MinContentWidth = 20;
     private const int MinContentHeight = 4;
     private const int InputSectionHeight = 4;
-    private const int BannerHeight = 6;
     private const int SeparatorHeight = 1;
-    private const int StatusSectionHeight = 4;
     private const int FooterHeight = 1;
     private const int PlaylistConfirmationHeight = 7;
     private const int SpinnerSectionHeight = 1;
@@ -22,18 +21,25 @@ internal sealed partial class TuiApp
     private const int QueuePanelGapHeight = 1;
     private const int MinQueueLogHeight = 2;
     private const int MinLogHeight = 4;
+    private const int HelpViewChromeHeight = 3 + 1 + 1;
+    private const int OuterPanelBorderHeight = 2;
 
-    // Fixed vertical height used for calculating manual internal limits
     private int CurrentFixedChromeHeight =>
-        BannerHeight
-        + SeparatorHeight
-        + StatusSectionHeight
-        + FooterHeight
-        + (ShowInput ? InputSectionHeight : 0)
-        + 2; // Spacing between major sections
+        GetFixedChromeHeight(
+            Components.GetBannerHeight(CurrentContentWidth),
+            GetStatusSectionHeight(CurrentContentWidth)
+        );
+
+    private static int CurrentWindowWidth => Math.Max(MinWindowWidth, Console.WindowWidth);
+
+    private static int CurrentContentWidth => GetContentWidth(CurrentWindowWidth);
 
     private bool ShowInput =>
-        _state.AwaitingUserToken || _state.Phase is TuiTransferPhase.Idle or TuiTransferPhase.Done;
+        !_state.ShowHelp
+        && (
+            _state.AwaitingUserToken
+            || _state.Phase is TuiTransferPhase.Idle or TuiTransferPhase.Done
+        );
 
     // Lines consumed within the Done view by non-table elements.
     // Summary panel (3) + Gap(1) + Table header and borders (3) + Gap (1) + Hint (1)
@@ -49,28 +55,43 @@ internal sealed partial class TuiApp
 
     private Panel BuildView()
     {
-        var width = Math.Max(MinWindowWidth, Console.WindowWidth);
+        var width = CurrentWindowWidth;
         var height = Console.WindowHeight;
-        var contentWidth = Math.Max(MinContentWidth, width - ContentHorizontalPadding);
-        var contentHeight = Math.Max(MinContentHeight, height - CurrentFixedChromeHeight);
+        var contentWidth = GetContentWidth(width);
+        var bannerHeight = Components.GetBannerHeight(contentWidth);
+        var statusSectionHeight = GetStatusSectionHeight(contentWidth);
+        var contentHeight = Math.Max(
+            MinContentHeight,
+            height - GetFixedChromeHeight(bannerHeight, statusSectionHeight)
+        );
 
-        var layout = new Layout(RegionRoot).SplitRows(
-            new Layout(RegionBanner).Size(BannerHeight),
+        var rows = new List<Layout>
+        {
+            new Layout(RegionBanner).Size(bannerHeight),
             new Layout(RegionSeparator).Size(SeparatorHeight),
-            new Layout(RegionBadgesAndStepper).Size(StatusSectionHeight),
-            new Layout(RegionMain),
+        };
+
+        if (statusSectionHeight > 0)
+            rows.Add(new Layout(RegionBadgesAndStepper).Size(statusSectionHeight));
+
+        rows.Add(new Layout(RegionMain));
+        rows.Add(
             new Layout(RegionFooter).Size(
                 ShowInput ? InputSectionHeight + FooterHeight : FooterHeight
             )
         );
 
+        var layout = new Layout(RegionRoot).SplitRows([.. rows]);
+
         layout[RegionBanner].Update(Components.RenderBanner(contentWidth));
         layout[RegionSeparator].Update(new Rule { Style = new Style(Theme.GrayColor) });
 
-        layout[RegionBadgesAndStepper].Update(BuildStatusSection());
+        if (statusSectionHeight > 0)
+            layout[RegionBadgesAndStepper].Update(BuildStatusSection());
+
         layout[RegionMain].Update(BuildMainContent(contentWidth, contentHeight));
 
-        layout[RegionFooter].Update(new Rows(BuildFooterItems(contentWidth)));
+        layout[RegionFooter].Update(new Rows(BuildFooterItems(contentWidth, contentHeight)));
 
         return new Panel(layout)
         {
@@ -82,7 +103,21 @@ internal sealed partial class TuiApp
         };
     }
 
-    private List<IRenderable> BuildFooterItems(int contentWidth)
+    private int GetFixedChromeHeight(int bannerHeight, int statusSectionHeight) =>
+        bannerHeight
+        + SeparatorHeight
+        + statusSectionHeight
+        + FooterHeight
+        + (ShowInput ? InputSectionHeight : 0)
+        + OuterPanelBorderHeight;
+
+    private int GetStatusSectionHeight(int contentWidth) =>
+        ShouldShowStatusSection(contentWidth) ? 4 : 0;
+
+    private static int GetContentWidth(int width) =>
+        Math.Max(MinContentWidth, width - ContentHorizontalPadding);
+
+    private List<IRenderable> BuildFooterItems(int contentWidth, int contentHeight)
     {
         var items = new List<IRenderable>(ShowInput ? 3 : 1);
 
@@ -96,7 +131,8 @@ internal sealed partial class TuiApp
             Components.RenderContextualFooter(
                 _state.Phase,
                 _state.AwaitingUserToken,
-                _state.ShowHelp
+                _state.ShowHelp,
+                ShouldShowScrollActions(contentHeight)
             )
         );
         return items;
@@ -113,18 +149,22 @@ internal sealed partial class TuiApp
             )
             : Components.RenderInput(_inputBuffer.ToString(), _state.CursorVisible, contentWidth);
 
-    private Rows BuildStatusSection() =>
-        new(
-            Components.RenderStatusBadges(
-                tokenCache.HasValidDeveloperToken,
-                tokenCache.HasValidUserToken,
-                _state.Storefront,
-                _state.NextPlaylistName
-            ),
+    private Rows BuildStatusSection()
+    {
+        var badges = Components.RenderStatusBadges(
+            tokenCache.HasValidDeveloperToken,
+            tokenCache.HasValidUserToken,
+            _state.Storefront,
+            _state.NextPlaylistName
+        );
+
+        return new Rows(
+            badges,
             new Text(string.Empty),
             Components.RenderStepper(_state.Phase),
             new Text(string.Empty)
         );
+    }
 
     private IRenderable BuildMainContent(int contentWidth, int contentHeight) =>
         _state.Phase switch
@@ -206,7 +246,7 @@ internal sealed partial class TuiApp
                 : contentHeight;
 
         if (_state.ShowHelp && _state.Phase is TuiTransferPhase.Idle)
-            return BuildHelpView();
+            return BuildHelpView(contentHeight);
 
         if (_state.QueuedPlaylistUrls.Count > 0 && _state.Phase is TuiTransferPhase.Idle)
             return BuildQueuedPlaylistsView(width, contentHeight);
@@ -219,8 +259,22 @@ internal sealed partial class TuiApp
         return logs;
     }
 
-    private static Align BuildHelpView() =>
-        new(Components.RenderHelpTable(), HorizontalAlignment.Center, VerticalAlignment.Middle);
+    private Align BuildHelpView(int contentHeight)
+    {
+        var visibleRows = GetVisibleHelpRows(contentHeight);
+        var table = Components.RenderHelpTable(_state.ScrollOffset, visibleRows);
+        var hint = Components.RenderHelpScrollHint(
+            _state.ScrollOffset,
+            Components.HelpEntryCount,
+            visibleRows
+        );
+
+        return new Align(
+            new Rows(Align.Center(table), new Text(string.Empty), Align.Center(hint)),
+            HorizontalAlignment.Center,
+            VerticalAlignment.Middle
+        );
+    }
 
     private Rows BuildQueuedPlaylistsView(int width, int contentHeight)
     {
@@ -259,7 +313,7 @@ internal sealed partial class TuiApp
         var notFound = total - matched;
 
         var summary = Components.RenderSummaryPanel(_state.PlaylistName, matched, total, notFound);
-        var visibleRows = Math.Max(3, contentHeight - DoneViewChromeHeight);
+        var visibleRows = GetVisibleDoneRows(contentHeight);
         var table = Components.RenderResultsTable(
             _state.AllResults,
             _state.ScrollOffset,
@@ -281,4 +335,33 @@ internal sealed partial class TuiApp
         var user = tokenCache.HasValidUserToken ? "valid" : "missing";
         return $"Developer token: {dev}  |  User token: {user}  |  Storefront: {_state.Storefront}";
     }
+
+    private bool ShouldShowStatusSection(int contentWidth) =>
+        !_state.ShowHelp && contentWidth >= MinStatusSectionWidth;
+
+    private bool ShouldShowScrollActions(int contentHeight)
+    {
+        if (_state.ShowHelp && _state.Phase is TuiTransferPhase.Idle)
+            return Components.HelpEntryCount > GetVisibleHelpRows(contentHeight);
+
+        if (_state.Phase is not TuiTransferPhase.Done || _state.AllResults is null)
+            return false;
+
+        return _state.AllResults.Count > GetVisibleDoneRows(contentHeight);
+    }
+
+    private static int GetVisibleRows(int contentHeight, int chromeHeight) =>
+        Math.Max(3, contentHeight - chromeHeight);
+
+    private static int GetVisibleDoneRows(int contentHeight) =>
+        GetVisibleRows(contentHeight, DoneViewChromeHeight);
+
+    private int GetVisibleDoneRows() =>
+        GetVisibleDoneRows(Console.WindowHeight - CurrentFixedChromeHeight);
+
+    private static int GetVisibleHelpRows(int contentHeight) =>
+        GetVisibleRows(contentHeight, HelpViewChromeHeight);
+
+    private int GetVisibleHelpRows() =>
+        GetVisibleHelpRows(Console.WindowHeight - CurrentFixedChromeHeight);
 }

@@ -6,6 +6,11 @@ internal sealed class TuiCommandRegistry
         StringComparer.OrdinalIgnoreCase
     );
 
+    internal void Register(Action handler, params string[] aliases)
+    {
+        Register(_ => handler(), aliases);
+    }
+
     internal void Register(Action<string?> handler, params string[] aliases)
     {
         foreach (var alias in aliases)
