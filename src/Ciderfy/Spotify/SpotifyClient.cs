@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Ciderfy.Web;
 using OtpNet;
@@ -109,9 +110,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
                 Convert.FromBase64String(configMatch.Groups[1].Value)
             );
             using var doc = JsonDocument.Parse(json);
-
-            if (doc.RootElement.TryGetProperty("clientVersion", out var version))
-                _clientVersion = version.GetString();
+            _clientVersion = doc.RootElement.Deserialize<SessionInfoResponse>()?.ClientVersion;
         }
 
         ExtractDeviceIdFromCookies();
@@ -129,8 +128,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         var json = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(json);
 
-        _accessToken = doc.RootElement.GetProperty("accessToken").GetString();
-        _clientId = doc.RootElement.GetProperty("clientId").GetString();
+        var tokenResponse = doc.RootElement.Deserialize<AccessTokenResponse>();
+        _accessToken = tokenResponse?.AccessToken;
+        _clientId = tokenResponse?.ClientId;
 
         ExtractDeviceIdFromCookies();
     }
@@ -170,13 +170,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         var json = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(json);
 
-        if (
-            doc.RootElement.TryGetProperty("granted_token", out var grantedToken)
-            && grantedToken.TryGetProperty("token", out var token)
-        )
-        {
-            _clientToken = token.GetString();
-        }
+        _clientToken = doc.RootElement.Deserialize<ClientTokenResponse>()?.GrantedToken?.Token;
     }
 
     /// <summary>
@@ -343,3 +337,18 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
     [GeneratedRegex(@"<script id=""appServerConfig"" type=""text/plain"">([^<]+)</script>")]
     private static partial Regex AppServerConfigRegex();
 }
+
+file sealed record SessionInfoResponse(
+    [property: JsonPropertyName("clientVersion")] string? ClientVersion
+);
+
+file sealed record AccessTokenResponse(
+    [property: JsonPropertyName("accessToken")] string? AccessToken,
+    [property: JsonPropertyName("clientId")] string? ClientId
+);
+
+file sealed record ClientTokenGrantedToken([property: JsonPropertyName("token")] string? Token);
+
+file sealed record ClientTokenResponse(
+    [property: JsonPropertyName("granted_token")] ClientTokenGrantedToken? GrantedToken
+);

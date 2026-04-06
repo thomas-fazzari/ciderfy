@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Ciderfy.Configuration.Options;
 using Microsoft.Extensions.Options;
@@ -67,12 +68,8 @@ internal sealed class DeezerIsrcResolver(
         if (json is null)
             return null;
 
-        using var doc = JsonDocument.Parse(json);
-
-        if (!doc.RootElement.TryGetProperty("data", out var data) || data.GetArrayLength() == 0)
-            return null;
-
-        return data[0].TryGetProperty("isrc", out var isrc) ? isrc.GetString() : null;
+        var response = JsonSerializer.Deserialize<DeezerSearchResponse>(json);
+        return response?.Data?.FirstOrDefault()?.Isrc;
     }
 
     private async Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct)
@@ -92,11 +89,7 @@ internal sealed class DeezerIsrcResolver(
         {
             throw;
         }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
-        catch (TaskCanceledException)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             return null;
         }
@@ -107,3 +100,9 @@ internal sealed class DeezerIsrcResolver(
         _rateLimiter.Dispose();
     }
 }
+
+file sealed record DeezerSearchItem([property: JsonPropertyName("isrc")] string? Isrc);
+
+file sealed record DeezerSearchResponse(
+    [property: JsonPropertyName("data")] IReadOnlyList<DeezerSearchItem>? Data
+);

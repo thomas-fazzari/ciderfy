@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Ciderfy.Configuration.Options;
 using Ciderfy.Web;
@@ -292,23 +293,17 @@ internal sealed class AppleMusicClient(
 
     internal static AppleMusicTrack? ParseTrack(JsonElement element)
     {
-        if (
-            !element.TryGetProperty("id", out var id)
-            || !element.TryGetProperty("attributes", out var attrs)
-        )
+        var e = element.Deserialize<AppleTrackElement>();
+        if (e?.Id is null || e.Attributes is null)
             return null;
 
         return new AppleMusicTrack
         {
-            Id = id.GetString() ?? string.Empty,
-            Title = attrs.TryGetProperty("name", out var name)
-                ? name.GetString() ?? string.Empty
-                : string.Empty,
-            Artist = attrs.TryGetProperty("artistName", out var artist)
-                ? artist.GetString() ?? string.Empty
-                : string.Empty,
-            DurationMs = attrs.TryGetProperty("durationInMillis", out var dur) ? dur.GetInt32() : 0,
-            Isrc = attrs.TryGetProperty("isrc", out var isrc) ? isrc.GetString() : null,
+            Id = e.Id,
+            Title = e.Attributes.Name ?? string.Empty,
+            Artist = e.Attributes.ArtistName ?? string.Empty,
+            DurationMs = e.Attributes.DurationMs,
+            Isrc = e.Attributes.Isrc,
         };
     }
 
@@ -317,3 +312,15 @@ internal sealed class AppleMusicClient(
         _rateLimiter.Dispose();
     }
 }
+
+file sealed record AppleTrackAttributes(
+    [property: JsonPropertyName("name")] string? Name,
+    [property: JsonPropertyName("artistName")] string? ArtistName,
+    [property: JsonPropertyName("durationInMillis")] int DurationMs,
+    [property: JsonPropertyName("isrc")] string? Isrc
+);
+
+file sealed record AppleTrackElement(
+    [property: JsonPropertyName("id")] string? Id,
+    [property: JsonPropertyName("attributes")] AppleTrackAttributes? Attributes
+);
