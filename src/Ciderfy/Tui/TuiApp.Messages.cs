@@ -133,7 +133,7 @@ internal sealed partial class TuiApp
         else
         {
             _state.Phase = TuiTransferPhase.CreatingPlaylist;
-            _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token));
+            _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token), _cts.Token);
         }
     }
 
@@ -152,7 +152,7 @@ internal sealed partial class TuiApp
         _logs.Append(LogKind.Separator, string.Empty);
 
         _state.Phase = TuiTransferPhase.CreatingPlaylist;
-        _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token));
+        _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token), _cts.Token);
     }
 
     private void HandlePlaylistCreated(PlaylistCreatedMsg msg)

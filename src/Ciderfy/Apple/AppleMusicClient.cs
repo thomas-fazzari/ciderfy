@@ -106,7 +106,9 @@ internal sealed class AppleMusicClient(
             || !results.TryGetProperty("songs", out var songs)
             || !songs.TryGetProperty("data", out var data)
         )
+        {
             return tracks;
+        }
 
         foreach (var item in data.EnumerateArray())
         {
@@ -192,9 +194,11 @@ internal sealed class AppleMusicClient(
             return headers;
 
         if (!_tokenCache.HasValidUserToken)
+        {
             throw new InvalidOperationException(
                 "User token is required for this operation. Run '/auth' first."
             );
+        }
 
         headers[MusicUserTokenHeader] = _tokenCache.UserToken!;
         return headers;

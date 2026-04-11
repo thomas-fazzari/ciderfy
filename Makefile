@@ -1,30 +1,47 @@
-PROJECTS = src/Ciderfy/Ciderfy.csproj tests/Ciderfy.Tests/Ciderfy.Tests.csproj
+SOLUTION = Ciderfy.slnx
+APP = src/Ciderfy/Ciderfy.csproj
 
+.PHONY: install
+install:
+	dotnet restore $(SOLUTION)
+	dotnet tool restore
+
+.PHONY: build
 build:
-	dotnet build
+	dotnet build $(SOLUTION) --no-restore
 
+.PHONY: run
 run:
-	dotnet run --project src/Ciderfy
+	dotnet run --project $(APP)
 
+.PHONY: test
 test:
-	dotnet test
+	dotnet test $(SOLUTION)
 
+.PHONY: test-unit
 test-unit:
-	dotnet test --filter "Category!=Integration"
+	dotnet test $(SOLUTION) --filter "Category!=Integration"
 
+.PHONY: format
 format:
-	dotnet csharpier format .
+	dotnet tool run csharpier format .
 
-check:
-	dotnet csharpier check .
-	dotnet roslynator analyze $(PROJECTS)
+.PHONY: lint
+lint:
+	dotnet tool run csharpier check .
+	dotnet build $(SOLUTION) --no-restore
 
+.PHONY: check
+check: lint
+
+.PHONY: fix
 fix:
-	dotnet csharpier format .
-	dotnet roslynator fix $(PROJECTS)
+	dotnet tool run csharpier format .
 
+.PHONY: outdated
 outdated:
-	dotnet dotnet-outdated
+	dotnet tool run dotnet-outdated
 
+.PHONY: pack
 pack:
-	dotnet pack src/Ciderfy -c Release -o ./artifacts
+	dotnet pack $(APP) -c Release -o ./artifacts

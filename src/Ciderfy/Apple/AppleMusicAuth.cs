@@ -120,7 +120,9 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
                 || !header.RootElement.TryGetProperty("kid", out var kid)
                 || string.IsNullOrWhiteSpace(kid.GetString())
             )
+            {
                 return false;
+            }
 
             var payloadJson = Encoding.UTF8.GetString(Base64Url.DecodeFromChars(parts[1]));
             using var payload = JsonDocument.Parse(payloadJson);
@@ -130,7 +132,9 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
                 || string.IsNullOrWhiteSpace(iss.GetString())
                 || !payload.RootElement.TryGetProperty("exp", out var exp)
             )
+            {
                 return false;
+            }
 
             var expiry = DateTimeOffset.FromUnixTimeSeconds(exp.GetInt64());
             return expiry > DateTimeOffset.UtcNow.AddMinutes(5);
@@ -163,9 +167,13 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
         }
     }
 
-    [GeneratedRegex(@"<script[^>]+src=""([^""]+\.js[^""]*)""")]
+    [GeneratedRegex(@"<script[^>]+src=""([^""]+\.js[^""]*)""", RegexOptions.None, 1000)]
     private static partial Regex ScriptSrcRegex();
 
-    [GeneratedRegex(@"eyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}")]
+    [GeneratedRegex(
+        @"eyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}",
+        RegexOptions.None,
+        1000
+    )]
     private static partial Regex JwtTokenRegex();
 }

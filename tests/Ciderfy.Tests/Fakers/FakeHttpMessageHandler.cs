@@ -8,7 +8,7 @@ internal sealed class FakeHttpMessageHandler(Func<HttpRequestMessage, HttpRespon
 {
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
-        CancellationToken ct
+        CancellationToken cancellationToken
     ) => Task.FromResult(handler(request));
 
     internal static HttpClient Returning(HttpStatusCode status, string body = "") =>

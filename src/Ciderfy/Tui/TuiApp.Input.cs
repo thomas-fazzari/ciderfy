@@ -82,7 +82,7 @@ internal sealed partial class TuiApp
             _state.ProgressCurrent = 0;
             _state.ProgressTotal = _state.TransferTracks?.Count ?? 0;
             _logs.Append(LogKind.Info, "Starting ISRC matching...");
-            _ = Task.Run(() => RunIsrcMatchAsync(_cts.Token));
+            _ = Task.Run(() => RunIsrcMatchAsync(_cts.Token), _cts.Token);
         }
         else if (key.Key is ConsoleKey.Escape or ConsoleKey.Backspace)
         {
@@ -183,7 +183,7 @@ internal sealed partial class TuiApp
                 _state.ProgressTotal = _state.UnmatchedTracks?.Count ?? 0;
                 _state.ProgressLabel = string.Empty;
                 _logs.Append(LogKind.Info, "Starting text matching...");
-                _ = Task.Run(() => RunTextMatchAsync(_cts.Token));
+                _ = Task.Run(() => RunTextMatchAsync(_cts.Token), _cts.Token);
                 break;
             case 'n':
                 _logs.Append(LogKind.Info, "Text matching skipped.");
@@ -195,7 +195,7 @@ internal sealed partial class TuiApp
                 }
 
                 _state.Phase = TuiTransferPhase.CreatingPlaylist;
-                _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token));
+                _ = Task.Run(() => RunCreatePlaylistAsync(_cts.Token), _cts.Token);
                 break;
         }
     }
@@ -240,7 +240,7 @@ internal sealed partial class TuiApp
             _state.Phase = TuiTransferPhase.FetchingPlaylist;
             _logs.Clear();
             _logs.Append(LogKind.Info, "Starting transfer...");
-            _ = Task.Run(() => RunFetchPlaylistAsync([urlInfo.Id], _cts.Token));
+            _ = Task.Run(() => RunFetchPlaylistAsync([urlInfo.Id], _cts.Token), _cts.Token);
             return;
         }
 

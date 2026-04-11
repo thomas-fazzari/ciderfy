@@ -259,12 +259,13 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
             + @"|bonus\s+track|remix"
             + @"|re-recorded"
             + @").*$",
-        RegexOptions.IgnoreCase
+        RegexOptions.IgnoreCase,
+        1000
     )]
     private static partial Regex VersionSuffixRegex();
 
     // Matches featuring clauses in titles
-    [GeneratedRegex(@"\s*(feat\.?|ft\.?)\s+.*$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\s*(feat\.?|ft\.?)\s+.*$", RegexOptions.IgnoreCase, 1000)]
     private static partial Regex FeaturingRegex();
 
     // Matches parenthesized/bracketed version info, ex: "(Remastered 2012)"
@@ -277,7 +278,8 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
             + @"|re-recorded"
             + @"|feat\.?\s+.+|ft\.?\s+.+"
             + @")[\)\]]",
-        RegexOptions.IgnoreCase
+        RegexOptions.IgnoreCase,
+        1000
     )]
     private static partial Regex ParenVersionRegex();
 }

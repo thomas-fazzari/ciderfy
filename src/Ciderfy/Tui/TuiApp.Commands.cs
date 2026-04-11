@@ -74,7 +74,7 @@ internal sealed partial class TuiApp
         }
 
         _logs.Append(LogKind.Info, "Authenticating...");
-        _ = Task.Run(() => RunAuthAsync(_cts.Token));
+        _ = Task.Run(() => RunAuthAsync(_cts.Token), _cts.Token);
     }
 
     private void HandleAddCommand(string? argument)
@@ -93,13 +93,13 @@ internal sealed partial class TuiApp
 
         foreach (var url in urls)
         {
-            if (SpotifyUrlInfo.TryParse(url, out var urlInfo))
+            if (
+                SpotifyUrlInfo.TryParse(url, out var urlInfo)
+                && !_state.QueuedPlaylistUrls.Contains(urlInfo.Id)
+            )
             {
-                if (!_state.QueuedPlaylistUrls.Contains(urlInfo.Id))
-                {
-                    _state.QueuedPlaylistUrls.Add(urlInfo.Id);
-                    addedCount++;
-                }
+                _state.QueuedPlaylistUrls.Add(urlInfo.Id);
+                addedCount++;
             }
         }
 
@@ -135,6 +135,6 @@ internal sealed partial class TuiApp
             LogKind.Info,
             $"Starting transfer of {playlistIdsToFetch.Count} merged playlists..."
         );
-        Task.Run(() => RunFetchPlaylistAsync(playlistIdsToFetch, _cts.Token));
+        _ = Task.Run(() => RunFetchPlaylistAsync(playlistIdsToFetch, _cts.Token), _cts.Token);
     }
 }

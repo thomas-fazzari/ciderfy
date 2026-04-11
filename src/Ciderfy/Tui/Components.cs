@@ -437,9 +437,11 @@ internal static class Components
         if (showHelp)
         {
             if (showScrollActions)
+            {
                 return new Markup(
                     $"[{Theme.Primary}]Up/Down[/] scroll  [{Theme.Primary}]Enter[/] hide help  [{Theme.Primary}]Ctrl+C[/] quit"
                 );
+            }
 
             return new Markup(
                 $"[{Theme.Primary}]Enter[/] hide help  [{Theme.Primary}]Ctrl+C[/] quit"
@@ -447,16 +449,20 @@ internal static class Components
         }
 
         if (awaitingUserToken)
+        {
             return new Markup(
                 $"[{Theme.Primary}]Enter[/] submit token  [{Theme.Muted}]Esc[/] cancel  [{Theme.Muted}]Ctrl+C[/] quit"
             );
+        }
 
         if (phase is TuiTransferPhase.Done)
         {
             if (showScrollActions)
+            {
                 return new Markup(
                     $"[{Theme.Primary}]Up/Down[/] scroll  [{Theme.Primary}]Enter[/] new transfer  [{Theme.Muted}]Ctrl+C[/] quit"
                 );
+            }
 
             return new Markup(
                 $"[{Theme.Primary}]Enter[/] new transfer  [{Theme.Muted}]Ctrl+C[/] quit"

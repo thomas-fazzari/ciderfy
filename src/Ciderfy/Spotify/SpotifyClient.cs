@@ -238,7 +238,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             !doc.RootElement.TryGetProperty("data", out var data)
             || !data.TryGetProperty("playlistV2", out var playlist)
         )
+        {
             return new SpotifyPlaylist("Spotify Import", tracks);
+        }
 
         var name = playlist.TryGetProperty("name", out var n)
             ? n.GetString() ?? "Spotify Import"
@@ -248,7 +250,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             !playlist.TryGetProperty("content", out var content)
             || !content.TryGetProperty("items", out var items)
         )
+        {
             return new SpotifyPlaylist(name, tracks);
+        }
 
         foreach (var item in items.EnumerateArray())
         {
@@ -266,7 +270,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             !item.TryGetProperty("itemV2", out var itemV2)
             || !itemV2.TryGetProperty("data", out var itemData)
         )
+        {
             return null;
+        }
 
         var title = itemData.TryGetProperty("name", out var tn) ? tn.GetString() : null;
         if (string.IsNullOrWhiteSpace(title))
@@ -298,7 +304,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             || !artists.TryGetProperty("items", out var items)
             || items.GetArrayLength() == 0
         )
+        {
             return false;
+        }
 
         if (
             items[0].TryGetProperty("profile", out var profile)
@@ -323,7 +331,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             !element.TryGetProperty("trackDuration", out var duration)
             || !duration.TryGetProperty("totalMilliseconds", out var milliseconds)
         )
+        {
             return 0;
+        }
 
         return milliseconds.ValueKind switch
         {
@@ -334,7 +344,11 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         };
     }
 
-    [GeneratedRegex(@"<script id=""appServerConfig"" type=""text/plain"">([^<]+)</script>")]
+    [GeneratedRegex(
+        @"<script id=""appServerConfig"" type=""text/plain"">([^<]+)</script>",
+        RegexOptions.None,
+        1000
+    )]
     private static partial Regex AppServerConfigRegex();
 }
 

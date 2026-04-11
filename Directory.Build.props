@@ -10,8 +10,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <MeziantouAnalysisMode>None</MeziantouAnalysisMode>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Meziantou.Analyzer" PrivateAssets="all" />
+    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" />
+  </ItemGroup>
 
   <ItemGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">
     <InternalsVisibleTo Include="$(MSBuildProjectName).Tests" />
