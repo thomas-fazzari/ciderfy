@@ -29,6 +29,7 @@ format:
 .PHONY: lint
 lint:
 	dotnet tool run csharpier check .
+	dotnet tool run slopwatch analyze --fail-on warning
 	dotnet build $(SOLUTION) --no-restore
 
 .PHONY: check

@@ -1,18 +1,21 @@
 {
-  "version": 1,
-  "isRoot": true,
-  "tools": {
-    "csharpier": {
-      "version": "1.2.6",
-      "commands": [
-        "csharpier"
-      ],
-      "rollForward": false
-    },
-    "dotnet-outdated-tool": {
-					"version": "4.7.1",
-					"commands": ["dotnet-outdated"],
-					"rollForward": false
-				}
-  }
+	"version": 1,
+	"isRoot": true,
+	"tools": {
+		"csharpier": {
+			"version": "1.2.6",
+			"commands": ["csharpier"],
+			"rollForward": false
+		},
+		"dotnet-outdated-tool": {
+			"version": "4.7.1",
+			"commands": ["dotnet-outdated"],
+			"rollForward": false
+		},
+		"slopwatch.cmd": {
+			"version": "0.2.0",
+			"commands": ["slopwatch"],
+			"rollForward": false
+		}
+	}
 }

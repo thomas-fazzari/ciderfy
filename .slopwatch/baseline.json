@@ -1,0 +1,35 @@
+{
+	"version": 1,
+	"createdAt": "2026-04-12T10:45:01.740425+00:00",
+	"updatedAt": "2026-04-12T10:45:01.74285+00:00",
+	"description": "Initial baseline created by \u0027slopwatch init\u0027 on 2026-04-12 10:45:01 UTC",
+	"entries": [
+		{
+			"hash": "2e32495cc8793083",
+			"ruleId": "SW003",
+			"filePath": "src/Ciderfy/Apple/AppleMusicAuth.cs",
+			"lineNumber": 88,
+			"codeSnippet": "catch (Exception e)\n                when (e is HttpRequestException\n                    || (e is TaskCanceledException \u0026\u0026 !ct.IsCancellationRequested)\n                )\n            {\n    // ...",
+			"message": "Empty catch block swallows exceptions without handling",
+			"baselinedAt": "2026-04-12T10:45:01.742799+00:00"
+		},
+		{
+			"hash": "4f44e160463aabcc",
+			"ruleId": "SW003",
+			"filePath": "src/Ciderfy/Apple/TokenCache.cs",
+			"lineNumber": 58,
+			"codeSnippet": "catch (Exception e) when (e is IOException or UnauthorizedAccessException)\n        {\n            // Best effort\n        }",
+			"message": "Empty catch block swallows exceptions without handling",
+			"baselinedAt": "2026-04-12T10:45:01.742846+00:00"
+		},
+		{
+			"hash": "ee4d8440f3a64028",
+			"ruleId": "SW003",
+			"filePath": "src/Ciderfy/Tui/TuiApp.cs",
+			"lineNumber": 131,
+			"codeSnippet": "catch (OperationCanceledException)\n        {\n            // Either timeout or quit\n        }",
+			"message": "Empty catch block swallows exceptions without handling",
+			"baselinedAt": "2026-04-12T10:45:01.74285+00:00"
+		}
+	]
+}
