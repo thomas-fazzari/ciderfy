@@ -6,7 +6,7 @@
 - `src/Ciderfy/` -> feature-driven TUI app
 - `tests/Ciderfy.Tests/` -> tests and fakers
 
-**Useful Commands:** `make test` | `make test-unit` | `make lint` | `make fix` | `make pack`
+**Useful Commands:** `make test` | `make test-unit` | `make lint` | `make fix`
 
 **Enforcement:** csharpier (C#), TreatWarningsAsErrors, Meziantou+Roslynator analyzers, slopwatch, husky pre-commit (runs `make lint`)
 

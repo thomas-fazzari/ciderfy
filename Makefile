@@ -42,7 +42,3 @@ fix:
 .PHONY: outdated
 outdated:
 	dotnet tool run dotnet-outdated
-
-.PHONY: pack
-pack:
-	dotnet pack $(APP) -c Release -o ./artifacts
