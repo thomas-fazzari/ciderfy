@@ -5,9 +5,9 @@
       <DataCollector friendlyName="XPlat Code Coverage">
         <Configuration>
           <Format>cobertura,opencover</Format>
-          <Exclude>[ciderfy]Ciderfy.Tui.*,[ciderfy]Ciderfy.DependencyInjection.*,[ciderfy]Ciderfy.Configuration.*,[*.Tests]*</Exclude>
+          <Exclude>[ciderfy]Ciderfy.Tui.*,[*.Tests]*</Exclude>
           <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute,ExcludeFromCodeCoverageAttribute</ExcludeByAttribute>
-          <ExcludeByFile>**/Program.cs,**/obj/**/*,**/*.g.cs,**/*.designer.cs</ExcludeByFile>
+          <ExcludeByFile>**/Program.cs,**/obj/**/*,**/*.g.cs,**/*.designer.cs,**/DependencyInjection.cs,**/*Options.cs,**/*Extensions.cs</ExcludeByFile>
           <IncludeTestAssembly>false</IncludeTestAssembly>
           <SkipAutoProps>true</SkipAutoProps>
           <UseSourceLink>true</UseSourceLink>
