@@ -63,10 +63,10 @@ public class TokenCacheTests
     }
 
     [Fact]
-    public void HasValidUserToken_NoExpiry_ReturnsFalse()
+    public void HasValidUserToken_NoExpiry_ReturnsTrue()
     {
         var cache = new TokenCache { UserToken = "token", UserTokenExpiry = null };
-        Assert.False(cache.HasValidUserToken);
+        Assert.True(cache.HasValidUserToken);
     }
 
     [Fact]
@@ -94,39 +94,144 @@ public class TokenCacheTests
     [Fact]
     public void Clear_ResetsAllProperties()
     {
-        var cache = new TokenCache
+        var tempDir = CreateTempDirectory();
+        try
         {
-            DeveloperToken = "dev",
-            DeveloperTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
-            UserToken = "user",
-            UserTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
-        };
+            var cache = new TokenCache(Path.Combine(tempDir, "tokens.json"))
+            {
+                DeveloperToken = "dev",
+                DeveloperTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
+                UserToken = "user",
+                UserTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
+            };
 
-        cache.Clear();
+            cache.Clear();
 
-        Assert.Null(cache.DeveloperToken);
-        Assert.Null(cache.DeveloperTokenExpiry);
-        Assert.Null(cache.UserToken);
-        Assert.Null(cache.UserTokenExpiry);
+            Assert.Null(cache.DeveloperToken);
+            Assert.Null(cache.DeveloperTokenExpiry);
+            Assert.Null(cache.UserToken);
+            Assert.Null(cache.UserTokenExpiry);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
     }
 
     [Fact]
     public void ClearDeveloperToken_ClearsDeveloperToken_PreservesUserToken()
     {
-        var expiry = DateTimeOffset.UtcNow.AddHours(1);
-        var cache = new TokenCache
+        var tempDir = CreateTempDirectory();
+        try
         {
-            DeveloperToken = "dev",
-            DeveloperTokenExpiry = expiry,
-            UserToken = "user",
-            UserTokenExpiry = expiry,
-        };
+            var expiry = DateTimeOffset.UtcNow.AddHours(1);
+            var cache = new TokenCache(Path.Combine(tempDir, "tokens.json"))
+            {
+                DeveloperToken = "dev",
+                DeveloperTokenExpiry = expiry,
+                UserToken = "user",
+                UserTokenExpiry = expiry,
+            };
 
-        cache.ClearDeveloperToken();
+            cache.ClearDeveloperToken();
 
-        Assert.Null(cache.DeveloperToken);
-        Assert.Null(cache.DeveloperTokenExpiry);
-        Assert.Equal("user", cache.UserToken);
-        Assert.Equal(expiry, cache.UserTokenExpiry);
+            Assert.Null(cache.DeveloperToken);
+            Assert.Null(cache.DeveloperTokenExpiry);
+            Assert.Equal("user", cache.UserToken);
+            Assert.Equal(expiry, cache.UserTokenExpiry);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void LoadFromPath_CorruptedJson_ReturnsEmptyCache()
+    {
+        var tempDir = CreateTempDirectory();
+        try
+        {
+            var cachePath = Path.Combine(tempDir, "tokens.json");
+            File.WriteAllText(cachePath, "{not-json");
+
+            var cache = TokenCache.LoadFromPath(cachePath);
+
+            Assert.Null(cache.DeveloperToken);
+            Assert.Null(cache.DeveloperTokenExpiry);
+            Assert.Null(cache.UserToken);
+            Assert.Null(cache.UserTokenExpiry);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Save_ThenLoadFromPath_RoundTripsData()
+    {
+        var tempDir = CreateTempDirectory();
+        try
+        {
+            var cachePath = Path.Combine(tempDir, "tokens.json");
+            var expiry = DateTimeOffset.UtcNow.AddHours(1);
+            var cache = new TokenCache(cachePath)
+            {
+                DeveloperToken = "dev-token",
+                DeveloperTokenExpiry = expiry,
+                UserToken = "user-token",
+                UserTokenExpiry = null,
+            };
+
+            cache.Save();
+
+            var loaded = TokenCache.LoadFromPath(cachePath);
+
+            Assert.Equal("dev-token", loaded.DeveloperToken);
+            Assert.Equal(expiry, loaded.DeveloperTokenExpiry);
+            Assert.Equal("user-token", loaded.UserToken);
+            Assert.Null(loaded.UserTokenExpiry);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Save_WhenReplaceFails_DoesNotThrow_AndCleansTempFile()
+    {
+        var tempDir = CreateTempDirectory();
+        try
+        {
+            var destinationDirectory = Path.Combine(tempDir, "tokens");
+            Directory.CreateDirectory(destinationDirectory);
+
+            var cache = new TokenCache(destinationDirectory)
+            {
+                DeveloperToken = "dev-token",
+                DeveloperTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
+            };
+
+            var error = Record.Exception(() => cache.Save());
+
+            Assert.Null(error);
+            Assert.False(File.Exists($"{destinationDirectory}.tmp"));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    private static string CreateTempDirectory()
+    {
+        var tempDir = Path.Combine(
+            Path.GetTempPath(),
+            $"ciderfy-token-cache-tests-{Guid.NewGuid():N}"
+        );
+        Directory.CreateDirectory(tempDir);
+        return tempDir;
     }
 }

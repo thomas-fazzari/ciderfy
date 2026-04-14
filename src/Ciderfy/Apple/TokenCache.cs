@@ -13,7 +13,17 @@ internal sealed class TokenCache
         "Ciderfy"
     );
 
-    private static string CachePath => Path.Combine(_cacheDir, "tokens.json");
+    private static string DefaultCachePath => Path.Combine(_cacheDir, "tokens.json");
+
+    private string _cachePath = DefaultCachePath;
+
+    [JsonConstructor]
+    public TokenCache() { }
+
+    internal TokenCache(string cachePath)
+    {
+        _cachePath = cachePath;
+    }
 
     public string? DeveloperToken { get; set; }
     public DateTimeOffset? DeveloperTokenExpiry { get; set; }
@@ -27,37 +37,46 @@ internal sealed class TokenCache
 
     public bool HasValidUserToken =>
         !string.IsNullOrEmpty(UserToken)
-        && UserTokenExpiry.HasValue
-        && UserTokenExpiry.Value > DateTimeOffset.UtcNow;
+        && (!UserTokenExpiry.HasValue || UserTokenExpiry.Value > DateTimeOffset.UtcNow);
 
-    public static TokenCache Load()
+    public static TokenCache Load() => LoadFromPath(DefaultCachePath);
+
+    internal static TokenCache LoadFromPath(string cachePath)
     {
         try
         {
-            if (!File.Exists(CachePath))
-                return new TokenCache();
+            if (!File.Exists(cachePath))
+                return new TokenCache(cachePath);
 
-            var json = File.ReadAllText(CachePath);
-            return JsonSerializer.Deserialize(json, TokenCacheJsonContext.Default.TokenCache)
-                ?? new TokenCache();
+            var json = File.ReadAllText(cachePath);
+            var cache =
+                JsonSerializer.Deserialize(json, TokenCacheJsonContext.Default.TokenCache)
+                ?? new TokenCache(cachePath);
+            cache._cachePath = cachePath;
+            return cache;
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or JsonException)
         {
-            return new TokenCache();
+            return new TokenCache(cachePath);
         }
     }
 
     public void Save()
     {
+        var tempPath = $"{_cachePath}.tmp";
         try
         {
-            Directory.CreateDirectory(_cacheDir);
+            var cacheDirectory = Path.GetDirectoryName(_cachePath);
+            if (!string.IsNullOrEmpty(cacheDirectory))
+                Directory.CreateDirectory(cacheDirectory);
+
             var json = JsonSerializer.Serialize(this, TokenCacheJsonContext.Default.TokenCache);
-            File.WriteAllText(CachePath, json);
+            File.WriteAllText(tempPath, json);
+            File.Move(tempPath, _cachePath, overwrite: true);
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException)
         {
-            // Best effort
+            _ = TryDeleteTempFile(tempPath);
         }
     }
 
@@ -75,5 +94,21 @@ internal sealed class TokenCache
         DeveloperToken = null;
         DeveloperTokenExpiry = null;
         Save();
+    }
+
+    private static bool TryDeleteTempFile(string tempPath)
+    {
+        try
+        {
+            if (!File.Exists(tempPath))
+                return true;
+
+            File.Delete(tempPath);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 }

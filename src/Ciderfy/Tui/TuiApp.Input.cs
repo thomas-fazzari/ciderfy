@@ -257,7 +257,7 @@ internal sealed partial class TuiApp
         }
 
         tokenCache.UserToken = trimmed;
-        tokenCache.UserTokenExpiry = DateTimeOffset.UtcNow.AddMonths(3);
+        tokenCache.UserTokenExpiry = null;
         tokenCache.Save();
 
         _state.AwaitingUserToken = false;
