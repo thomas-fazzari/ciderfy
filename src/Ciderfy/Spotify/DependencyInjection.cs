@@ -1,12 +1,10 @@
 using System.Net;
-using Ciderfy.Configuration.Options;
-using Ciderfy.Spotify;
 using Ciderfy.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Ciderfy.DependencyInjection;
+namespace Ciderfy.Spotify;
 
 internal static class SpotifyExtensions
 {

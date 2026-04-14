@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Ciderfy.Configuration.Options;
+namespace Ciderfy.Matching;
 
 internal sealed class DeezerClientOptions
 {

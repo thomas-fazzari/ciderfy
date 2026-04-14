@@ -1,7 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
 using Ciderfy.Apple;
-using Ciderfy.Configuration.Options;
 using Ciderfy.Tests.Fakers;
 using Microsoft.Extensions.Options;
 using Xunit;

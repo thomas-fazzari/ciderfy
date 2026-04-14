@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using Ciderfy.Apple;
-using Ciderfy.Configuration.Options;
 using Ciderfy.Matching;
 using Ciderfy.Spotify;
 using Ciderfy.Tests.Fakers;

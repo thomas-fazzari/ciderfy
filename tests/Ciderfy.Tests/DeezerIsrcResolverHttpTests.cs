@@ -1,5 +1,4 @@
 using System.Net;
-using Ciderfy.Configuration.Options;
 using Ciderfy.Matching;
 using Ciderfy.Tests.Fakers;
 using Microsoft.Extensions.Options;

@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Ciderfy.Configuration.Options;
+namespace Ciderfy.Spotify;
 
 internal sealed class SpotifyClientOptions
 {

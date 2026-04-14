@@ -1,4 +1,4 @@
-using Ciderfy.DependencyInjection;
+using Ciderfy;
 using Ciderfy.Tui;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

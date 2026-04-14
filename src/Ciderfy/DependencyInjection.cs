@@ -1,7 +1,11 @@
+using Ciderfy.Apple;
+using Ciderfy.Matching;
+using Ciderfy.Spotify;
+using Ciderfy.Tui;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Ciderfy.DependencyInjection;
+namespace Ciderfy;
 
 internal static class CiderfyExtensions
 {

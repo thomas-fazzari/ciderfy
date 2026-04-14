@@ -1,11 +1,9 @@
-using Ciderfy.Configuration.Options;
-using Ciderfy.Matching;
 using Ciderfy.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Ciderfy.DependencyInjection;
+namespace Ciderfy.Matching;
 
 internal static class MatchingExtensions
 {

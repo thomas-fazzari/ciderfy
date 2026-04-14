@@ -3,7 +3,6 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using Ciderfy.Configuration.Options;
 using Ciderfy.Web;
 using Microsoft.Extensions.Options;
 

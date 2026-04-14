@@ -1,11 +1,9 @@
-using Ciderfy.Apple;
-using Ciderfy.Configuration.Options;
 using Ciderfy.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace Ciderfy.DependencyInjection;
+namespace Ciderfy.Apple;
 
 internal static class AppleExtensions
 {

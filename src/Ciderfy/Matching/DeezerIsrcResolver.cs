@@ -1,7 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
-using Ciderfy.Configuration.Options;
 using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Matching;

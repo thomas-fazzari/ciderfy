@@ -4,7 +4,7 @@
     <Copyright>Copyright © Thomas Fazzari 2026</Copyright>
     <Product>Ciderfy</Product>
     <Description>TUI tool to transfer Spotify playlists to Apple Music without any developer accounts</Description>
-    <VersionPrefix>1.0.6</VersionPrefix>
+    <VersionPrefix>1.0.7</VersionPrefix>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>

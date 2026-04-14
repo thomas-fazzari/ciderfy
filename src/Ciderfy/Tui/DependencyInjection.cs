@@ -1,7 +1,6 @@
-using Ciderfy.Tui;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Ciderfy.DependencyInjection;
+namespace Ciderfy.Tui;
 
 internal static class TuiExtensions
 {
