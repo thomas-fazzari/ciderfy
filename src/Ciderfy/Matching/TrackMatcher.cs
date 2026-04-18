@@ -40,7 +40,8 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
             if (!seen.Add(query))
                 continue;
 
-            var match = await TryTextMatchAsync(spotifyTrack, query, storefront, ct);
+            var match = await TryTextMatchAsync(spotifyTrack, query, storefront, ct)
+                .ConfigureAwait(false);
             if (match is not null)
                 return match;
         }
@@ -148,26 +149,29 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     internal static string NormalizeForComparison(string s)
     {
         s = StripVersionSuffix(s);
+#pragma warning disable CA1308
         s = s.ToLowerInvariant();
+#pragma warning restore CA1308
 
         // Normalize en-dash and em-dash to hyphen
         s = s.Replace('\u2013', '-').Replace('\u2014', '-');
 
         // Remove apostrophes
-        s = s.Replace("'", string.Empty).Replace("\u2019", string.Empty);
+        s = s.Replace("'", string.Empty, StringComparison.Ordinal)
+            .Replace("\u2019", string.Empty, StringComparison.Ordinal);
 
         // Remove quotes, parentheses, brackets
-        s = s.Replace("\"", string.Empty)
-            .Replace("(", string.Empty)
-            .Replace(")", string.Empty)
-            .Replace("[", string.Empty)
-            .Replace("]", string.Empty);
+        s = s.Replace("\"", string.Empty, StringComparison.Ordinal)
+            .Replace("(", string.Empty, StringComparison.Ordinal)
+            .Replace(")", string.Empty, StringComparison.Ordinal)
+            .Replace("[", string.Empty, StringComparison.Ordinal)
+            .Replace("]", string.Empty, StringComparison.Ordinal);
 
         // Remove featuring clauses
         s = FeaturingRegex().Replace(s, string.Empty);
 
         // Normalize "&" to "and"
-        s = s.Replace(" & ", " and ");
+        s = s.Replace(" & ", " and ", StringComparison.Ordinal);
 
         return s.Trim();
     }
@@ -179,7 +183,9 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         CancellationToken ct
     )
     {
-        var candidates = await appleMusicClient.SearchByTextAllAsync(query, storefront, ct);
+        var candidates = await appleMusicClient
+            .SearchByTextAllAsync(query, storefront, ct)
+            .ConfigureAwait(false);
         return FindBestMatch(spotifyTrack, candidates);
     }
 

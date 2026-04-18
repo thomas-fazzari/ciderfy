@@ -13,7 +13,9 @@ internal sealed class DeezerIsrcResolver(
     IOptions<DeezerClientOptions> options
 ) : IDisposable
 {
+#pragma warning disable S1075
     private const string SearchUrl = "https://api.deezer.com/search";
+#pragma warning restore S1075
 
     private readonly RateLimiter _rateLimiter = new SlidingWindowRateLimiter(
         new SlidingWindowRateLimiterOptions
@@ -41,19 +43,22 @@ internal sealed class DeezerIsrcResolver(
         var results = new TrackMetadata[tracks.Count];
         var completed = 0;
 
-        await Parallel.ForEachAsync(
-            Enumerable.Range(0, tracks.Count),
-            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
-            async (i, token) =>
-            {
-                var track = tracks[i];
-                var isrc = await FindIsrcAsync(track.Title, track.Artist, token);
-                results[i] = isrc is not null ? track with { Isrc = isrc } : track;
+        await Parallel
+            .ForEachAsync(
+                Enumerable.Range(0, tracks.Count),
+                new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+                async (i, token) =>
+                {
+                    var track = tracks[i];
+                    var isrc = await FindIsrcAsync(track.Title, track.Artist, token)
+                        .ConfigureAwait(false);
+                    results[i] = isrc is not null ? track with { Isrc = isrc } : track;
 
-                var currentCount = Interlocked.Increment(ref completed);
-                progress?.Report((currentCount, tracks.Count));
-            }
-        );
+                    var currentCount = Interlocked.Increment(ref completed);
+                    progress?.Report((currentCount, tracks.Count));
+                }
+            )
+            .ConfigureAwait(false);
 
         return [.. results];
     }
@@ -63,7 +68,7 @@ internal sealed class DeezerIsrcResolver(
         var query = Uri.EscapeDataString($"{artist} {title}");
         var url = $"{SearchUrl}?q={query}&limit=1";
 
-        var json = await GetWithRateLimitAsync(url, ct);
+        var json = await GetWithRateLimitAsync(url, ct).ConfigureAwait(false);
         if (json is null)
             return null;
 
@@ -73,16 +78,16 @@ internal sealed class DeezerIsrcResolver(
 
     private async Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct)
     {
-        using var lease = await _rateLimiter.AcquireAsync(permitCount: 1, ct);
+        using var lease = await _rateLimiter.AcquireAsync(permitCount: 1, ct).ConfigureAwait(false);
 
         try
         {
-            using var response = await httpClient.GetAsync(url, ct);
+            using var response = await httpClient.GetAsync(new Uri(url), ct).ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
                 return null;
 
-            return await response.Content.ReadAsStringAsync(ct);
+            return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

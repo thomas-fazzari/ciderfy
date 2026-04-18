@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 namespace Ciderfy.Apple;
 
 [JsonSerializable(typeof(TokenCache))]
-internal sealed partial class TokenCacheJsonContext : JsonSerializerContext { }
+internal sealed partial class TokenCacheJsonContext : JsonSerializerContext;
 
 internal sealed class TokenCache
 {

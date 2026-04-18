@@ -27,7 +27,9 @@ internal sealed class AppleMusicClient(
     TokenCache tokenCache
 ) : IDisposable
 {
+#pragma warning disable S1075
     private const string ApiBaseUrl = "https://api.music.apple.com/v1";
+#pragma warning restore S1075
     private const string MusicUserTokenHeader = "Music-User-Token";
 
     private readonly HttpClient _httpClient = httpClient;
@@ -60,7 +62,7 @@ internal sealed class AppleMusicClient(
 
             var joined = string.Join(',', batch);
             var url = $"{ApiBaseUrl}/catalog/{storefront}/songs?filter[isrc]={joined}";
-            var json = await GetWithRateLimitAsync(url, authHeaders, ct);
+            var json = await GetWithRateLimitAsync(url, authHeaders, ct).ConfigureAwait(false);
 
             if (json is null)
                 continue;
@@ -92,7 +94,7 @@ internal sealed class AppleMusicClient(
         var encodedQuery = Uri.EscapeDataString(query);
         var url =
             $"{ApiBaseUrl}/catalog/{storefront}/search?types=songs&limit=10&term={encodedQuery}";
-        var json = await GetWithRateLimitAsync(url, authHeaders, ct);
+        var json = await GetWithRateLimitAsync(url, authHeaders, ct).ConfigureAwait(false);
         var tracks = new List<AppleMusicTrack>();
 
         if (json is null)
@@ -139,7 +141,8 @@ internal sealed class AppleMusicClient(
         var json = JsonSerializer.Serialize(payload);
         var url = $"{ApiBaseUrl}/me/library/playlists";
 
-        var responseJson = await PostWithRateLimitAsync(url, json, authHeaders, ct);
+        var responseJson = await PostWithRateLimitAsync(url, json, authHeaders, ct)
+            .ConfigureAwait(false);
 
         if (responseJson is null)
             return null;
@@ -171,7 +174,8 @@ internal sealed class AppleMusicClient(
             var json = JsonSerializer.Serialize(payload);
             var url = $"{ApiBaseUrl}/me/library/playlists/{playlistId}/tracks";
 
-            var response = await PostWithRateLimitAsync(url, json, authHeaders, ct);
+            var response = await PostWithRateLimitAsync(url, json, authHeaders, ct)
+                .ConfigureAwait(false);
             if (response is null)
                 return false;
         }
@@ -184,7 +188,7 @@ internal sealed class AppleMusicClient(
         if (!_tokenCache.HasValidDeveloperToken)
             throw new AppleMusicUnauthorizedException();
 
-        var headers = new Dictionary<string, string>
+        var headers = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             [HttpHeaderNames.Authorization] = $"Bearer {_tokenCache.DeveloperToken}",
         };
@@ -225,14 +229,14 @@ internal sealed class AppleMusicClient(
         CancellationToken ct
     ) =>
         SendAsync(
-            async token =>
+            token =>
             {
                 var request = new HttpRequestMessage(HttpMethod.Post, url)
                 {
                     Content = new StringContent(jsonBody, Encoding.UTF8, MimeTypes.Json),
                 };
                 ApplyAuthHeaders(request, authHeaders);
-                return await _httpClient.SendAsync(request, token);
+                return _httpClient.SendAsync(request, token);
             },
             ct
         );
@@ -251,10 +255,10 @@ internal sealed class AppleMusicClient(
         CancellationToken ct
     )
     {
-        using var lease = await _rateLimiter.AcquireAsync(permitCount: 1, ct);
+        using var lease = await _rateLimiter.AcquireAsync(permitCount: 1, ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
 
-        using var response = await sendAsync(ct);
+        using var response = await sendAsync(ct).ConfigureAwait(false);
 
         if (response.StatusCode is HttpStatusCode.TooManyRequests)
             throw new AppleMusicRateLimitException(GetRetryAfterSeconds(response));
@@ -264,7 +268,7 @@ internal sealed class AppleMusicClient(
 
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(ct);
+            var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
             throw new HttpRequestException(
                 $"Apple Music API returned {(int)response.StatusCode} {response.StatusCode}"
                     + (string.IsNullOrWhiteSpace(body) ? string.Empty : $": {body}"),
@@ -273,7 +277,7 @@ internal sealed class AppleMusicClient(
             );
         }
 
-        return await response.Content.ReadAsStringAsync(ct);
+        return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
     }
 
     private static int? GetRetryAfterSeconds(HttpResponseMessage response)
@@ -312,6 +316,7 @@ internal sealed class AppleMusicClient(
 
     public void Dispose()
     {
+        _httpClient.Dispose();
         _rateLimiter.Dispose();
     }
 }

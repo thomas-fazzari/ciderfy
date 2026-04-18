@@ -297,12 +297,12 @@ internal static class Components
         var statusWidth = Math.Clamp(contentWidth / 3, 14, 26);
         var trackWidth = Math.Max(12, contentWidth - indexWidth - statusWidth);
 
-        var table = new Table();
-        table.Border(TableBorder.Simple);
-        table.BorderColor(Theme.GrayColor);
-        table.AddColumn(new TableColumn("[bold]#[/]") { Width = indexWidth }.NoWrap());
-        table.AddColumn(new TableColumn("[bold]Track[/]") { Width = trackWidth }.NoWrap());
-        table.AddColumn(new TableColumn("[bold]Status[/]") { Width = statusWidth }.NoWrap());
+        var table = new Table()
+            .Border(TableBorder.Simple)
+            .BorderColor(Theme.GrayColor)
+            .AddColumn(new TableColumn("[bold]#[/]") { Width = indexWidth }.NoWrap())
+            .AddColumn(new TableColumn("[bold]Track[/]") { Width = trackWidth }.NoWrap())
+            .AddColumn(new TableColumn("[bold]Status[/]") { Width = statusWidth }.NoWrap());
 
         var start = Math.Max(0, scrollOffset);
         var end = Math.Min(allResults.Count, start + visibleRows);
@@ -339,11 +339,7 @@ internal static class Components
     )
     {
         var detail = RenderMatchedStatus(match);
-        table.AddRow(
-            $"[{Theme.Gray}]{index + 1}[/]",
-            trackLabel,
-            $"{Theme.LogPrefixSuccess}{detail}"
-        );
+        table.AddRow($"[{Theme.Gray}]{index + 1}[/]", trackLabel, Theme.LogPrefixSuccess + detail);
     }
 
     private static void AddNotFoundRow(
@@ -396,11 +392,11 @@ internal static class Components
 
     internal static Table RenderHelpTable(int scrollOffset, int visibleRows)
     {
-        var table = new Table();
-        table.Border(TableBorder.Rounded);
-        table.BorderColor(Theme.PrimaryColor);
-        table.AddColumn(new TableColumn($"[bold]Command[/]").NoWrap());
-        table.AddColumn(new TableColumn("[bold]Description[/]"));
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Theme.PrimaryColor)
+            .AddColumn(new TableColumn($"[bold]Command[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
 
         var start = Math.Max(
             0,
@@ -490,7 +486,9 @@ internal static class Components
             return new Markup($"[{Theme.Muted}]Press Enter to start a new transfer[/]");
 
         return new Markup(
-            $"[{Theme.Muted}]{Theme.ArrowUp}/{Theme.ArrowDown} scroll[/]{BuildScrollPositionInfo(offset, total, visible)}[{Theme.Muted}]  {Theme.Bullet}  Press Enter to start a new transfer[/]"
+            $"[{Theme.Muted}]{Theme.ArrowUp}/{Theme.ArrowDown} scroll[/]"
+                + BuildScrollPositionInfo(offset, total, visible)
+                + $"[{Theme.Muted}]  {Theme.Bullet}  Press Enter to start a new transfer[/]"
         );
     }
 
@@ -506,22 +504,21 @@ internal static class Components
             : storefront.ToUpperInvariant();
         const int nameMaxLength = 56;
 
-        var grid = new Grid();
-        grid.AddColumn(new GridColumn().NoWrap());
-        grid.AddColumn();
-
-        grid.AddRow(
-            new Markup($"[{Theme.Muted}]Name[/]"),
-            new Markup($"[{Theme.White}]{Markup.Escape(Truncate(safeName, nameMaxLength))}[/]")
-        );
-        grid.AddRow(
-            new Markup($"[{Theme.Muted}]Tracks[/]"),
-            new Markup(Badge(tracksLabel, Theme.BadgeFg, Theme.BadgeGoodBg))
-        );
-        grid.AddRow(
-            new Markup($"[{Theme.Muted}]Storefront[/]"),
-            new Markup($"[{Theme.White}]{Markup.Escape(safeStorefront)}[/]")
-        );
+        var grid = new Grid()
+            .AddColumn(new GridColumn().NoWrap())
+            .AddColumn()
+            .AddRow(
+                new Markup($"[{Theme.Muted}]Name[/]"),
+                new Markup($"[{Theme.White}]{Markup.Escape(Truncate(safeName, nameMaxLength))}[/]")
+            )
+            .AddRow(
+                new Markup($"[{Theme.Muted}]Tracks[/]"),
+                new Markup(Badge(tracksLabel, Theme.BadgeFg, Theme.BadgeGoodBg))
+            )
+            .AddRow(
+                new Markup($"[{Theme.Muted}]Storefront[/]"),
+                new Markup($"[{Theme.White}]{Markup.Escape(safeStorefront)}[/]")
+            );
 
         return new Panel(
             new Rows(

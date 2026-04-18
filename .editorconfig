@@ -1,7 +1,11 @@
 root = true
 
 [*]
+charset = utf-8
+end_of_line = lf
 indent_style = space
+trim_trailing_whitespace = true
+insert_final_newline = true
 
 # Code files
 [*.{cs,csx}]
@@ -19,11 +23,26 @@ indent_size = 2
 [*.json]
 indent_size = 2
 
+# YAML files
+[*.{yml,yaml}]
+indent_size = 2
+
 # CSharp code style
 [*.cs]
+
+# Nullable errors
+dotnet_diagnostic.CS8600.severity = error
+dotnet_diagnostic.CS8601.severity = error
+dotnet_diagnostic.CS8602.severity = error
+dotnet_diagnostic.CS8603.severity = error
+dotnet_diagnostic.CS8604.severity = error
+
 # Imports and namespaces
 dotnet_sort_system_directives_first = true
 dotnet_diagnostic.IDE0130.severity = none
+
+# File-scoped namespaces
+csharp_style_namespace_declarations = file_scoped:warning
 
 # Qualification preferences
 dotnet_style_qualification_for_field = false:suggestion
@@ -41,7 +60,6 @@ dotnet_style_collection_initializer = true:suggestion
 dotnet_style_coalesce_expression = true:suggestion
 dotnet_style_null_propagation = true:suggestion
 dotnet_style_explicit_tuple_names = true:suggestion
-csharp_style_prefer_primary_constructors = true:suggestion
 csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
 csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
 csharp_style_inlined_variable_declaration = true:suggestion
@@ -69,6 +87,23 @@ csharp_new_line_before_finally = true
 csharp_new_line_before_members_in_object_initializers = true
 csharp_new_line_before_members_in_anonymous_types = true
 
+# Naming rules: interfaces must start with I
+dotnet_naming_rule.interfaces_must_start_with_i.severity = error
+dotnet_naming_rule.interfaces_must_start_with_i.symbols = interfaces
+dotnet_naming_rule.interfaces_must_start_with_i.style = prefix_i
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_style.prefix_i.required_prefix = I
+dotnet_naming_style.prefix_i.capitalization = pascal_case
+
+# Naming rules: async methods must end with Async
+dotnet_naming_rule.async_methods_must_end_with_async.severity = error
+dotnet_naming_rule.async_methods_must_end_with_async.symbols = async_methods
+dotnet_naming_rule.async_methods_must_end_with_async.style = end_with_async
+dotnet_naming_symbols.async_methods.applicable_kinds = method
+dotnet_naming_symbols.async_methods.required_modifiers = async
+dotnet_naming_style.end_with_async.required_suffix = Async
+dotnet_naming_style.end_with_async.capitalization = pascal_case
+
 # Naming rules: private const => PascalCase
 dotnet_naming_rule.private_const_should_be_pascal_case.severity = suggestion
 dotnet_naming_rule.private_const_should_be_pascal_case.symbols = private_const
@@ -87,52 +122,130 @@ dotnet_naming_symbols.private_fields.applicable_accessibilities = private, priva
 dotnet_naming_style.camel_case_underscore.required_prefix = _
 dotnet_naming_style.camel_case_underscore.capitalization = camel_case
 
+
+# .NET analyzers
+# Specify IFormatProvider
+dotnet_diagnostic.CA1305.severity = warning
+# Specify StringComparison for correctness
+dotnet_diagnostic.CA1310.severity = warning
+# Use ConfigureAwait
+dotnet_diagnostic.CA2007.severity = warning
+# Do not use LINQ on indexable collections
+dotnet_diagnostic.CA1826.severity = warning
+# Possible multiple enumerations of IEnumerable
+dotnet_diagnostic.CA1851.severity = warning
+# Disposable fields should be disposed
+dotnet_diagnostic.CA2213.severity = warning
+# Do not raise reserved exception types
+dotnet_diagnostic.CA2201.severity = warning
+# Seal internal types
+dotnet_diagnostic.CA1852.severity = warning
+
 # Roslynator: engine features
 roslynator_refactorings.enabled = true
 roslynator_compiler_diagnostic_fixes.enabled = true
 
-# Roslynator: analyzer severities
-dotnet_diagnostic.RCS1001.severity = warning   # Add braces when expression spans multiple lines
-dotnet_diagnostic.RCS1018.severity = warning   # Add default access modifier
-dotnet_diagnostic.RCS1033.severity = warning   # Remove redundant boolean literal
-dotnet_diagnostic.RCS1036.severity = warning   # Remove unnecessary blank line
-dotnet_diagnostic.RCS1037.severity = warning   # Remove trailing whitespace
-dotnet_diagnostic.RCS1040.severity = warning   # Remove empty else clause
-dotnet_diagnostic.RCS1041.severity = warning   # Remove empty initializer
-dotnet_diagnostic.RCS1061.severity = warning   # Merge if with nested if
-dotnet_diagnostic.RCS1077.severity = suggestion # Optimize LINQ method call
-dotnet_diagnostic.RCS1097.severity = warning   # Remove redundant ToString call
-dotnet_diagnostic.RCS1118.severity = suggestion # Mark local variable as const
-dotnet_diagnostic.RCS1128.severity = warning   # Use coalesce expression
-dotnet_diagnostic.RCS1129.severity = warning   # Remove redundant field initialization
-dotnet_diagnostic.RCS1132.severity = warning   # Remove redundant overriding member
-dotnet_diagnostic.RCS1163.severity = suggestion # Unused parameter
-dotnet_diagnostic.RCS1168.severity = warning   # Parameter name differs from base name
-dotnet_diagnostic.RCS1169.severity = warning   # Make field read-only
-dotnet_diagnostic.RCS1174.severity = suggestion # Remove redundant async/await
-dotnet_diagnostic.RCS1188.severity = warning   # Remove redundant auto-property initialization
-dotnet_diagnostic.RCS1192.severity = warning   # Unnecessary usage of verbatim string literal
-dotnet_diagnostic.RCS1194.severity = none      # Implement exception constructors
-dotnet_diagnostic.RCS1211.severity = warning   # Remove unnecessary else clause
-dotnet_diagnostic.RCS1212.severity = warning   # Remove redundant assignment
-dotnet_diagnostic.RCS1213.severity = warning   # Remove unused member declaration
-dotnet_diagnostic.RCS1214.severity = suggestion # Unnecessary interpolated string
-dotnet_diagnostic.RCS1215.severity = warning   # Expression is always equal to true/false
-dotnet_diagnostic.RCS1225.severity = suggestion # Make class sealed
-dotnet_diagnostic.RCS1229.severity = suggestion # Use async/await when necessary
-dotnet_diagnostic.RCS1235.severity = suggestion # Optimize method call
+# Roslynator: baseline (all enabled-by-default rules = warning)
+dotnet_analyzer_diagnostic.category-roslynator.severity = warning
+
+# Roslynator: per-rule overrides
+# Doc comment rules
+dotnet_diagnostic.RCS1005.severity = suggestion
+dotnet_diagnostic.RCS1021.severity = suggestion
+dotnet_diagnostic.RCS1060.severity = suggestion
+dotnet_diagnostic.RCS1139.severity = none
+dotnet_diagnostic.RCS1140.severity = none
+dotnet_diagnostic.RCS1141.severity = none
+dotnet_diagnostic.RCS1181.severity = suggestion
+dotnet_diagnostic.RCS1241.severity = suggestion
+dotnet_diagnostic.RCS1242.severity = suggestion
+# Add braces when expression spans multiple lines
+dotnet_diagnostic.RCS1001.severity = warning
+# Add default access modifier
+dotnet_diagnostic.RCS1018.severity = warning
+# Remove redundant boolean literal
+dotnet_diagnostic.RCS1033.severity = warning
+# Remove unnecessary blank line
+dotnet_diagnostic.RCS1036.severity = warning
+# Remove trailing whitespace
+dotnet_diagnostic.RCS1037.severity = warning
+# Remove empty else clause
+dotnet_diagnostic.RCS1040.severity = warning
+# Remove empty initializer
+dotnet_diagnostic.RCS1041.severity = warning
+# Merge if with nested if
+dotnet_diagnostic.RCS1061.severity = warning
+# Optimize LINQ method call
+dotnet_diagnostic.RCS1077.severity = warning
+# Remove redundant ToString call
+dotnet_diagnostic.RCS1097.severity = warning
+# Mark local variable as const
+dotnet_diagnostic.RCS1118.severity = warning
+# Use coalesce expression
+dotnet_diagnostic.RCS1128.severity = warning
+# Remove redundant field initialization
+dotnet_diagnostic.RCS1129.severity = warning
+# Remove redundant overriding member
+dotnet_diagnostic.RCS1132.severity = warning
+# Unused parameter
+dotnet_diagnostic.RCS1163.severity = warning
+# Parameter name differs from base name
+dotnet_diagnostic.RCS1168.severity = warning
+# Make field read-only
+dotnet_diagnostic.RCS1169.severity = warning
+# Remove redundant async/await
+dotnet_diagnostic.RCS1174.severity = warning
+# Remove redundant auto-property initialization
+dotnet_diagnostic.RCS1188.severity = warning
+# Unnecessary usage of verbatim string literal
+dotnet_diagnostic.RCS1192.severity = warning
+# Remove unnecessary else clause
+dotnet_diagnostic.RCS1211.severity = warning
+# Remove redundant assignment
+dotnet_diagnostic.RCS1212.severity = warning
+# Remove unused member declaration
+dotnet_diagnostic.RCS1213.severity = warning
+# Unnecessary interpolated string
+dotnet_diagnostic.RCS1214.severity = suggestion
+# Expression is always equal to true/false
+dotnet_diagnostic.RCS1215.severity = warning
+# Make class sealed
+dotnet_diagnostic.RCS1225.severity = warning
+# Use async/await when necessary
+dotnet_diagnostic.RCS1229.severity = warning
+# Optimize method call
+dotnet_diagnostic.RCS1235.severity = warning
 
 # Meziantou
-dotnet_diagnostic.MA0009.severity = warning # Regex evaluation timeout
-dotnet_diagnostic.MA0032.severity = warning # Use overload with a CancellationToken arg
-dotnet_diagnostic.MA0040.severity = warning # Forward CancellationToken param to methods that take one
-dotnet_diagnostic.MA0079.severity = warning # Forward the CancellationToken using WithCancellation()
-dotnet_diagnostic.MA0110.severity = warning # Use Regex source generator
+# Regex evaluation timeout
+dotnet_diagnostic.MA0009.severity = warning
+# Use overload with a CancellationToken arg
+dotnet_diagnostic.MA0032.severity = warning
+# Forward CancellationToken param to methods that take one
+dotnet_diagnostic.MA0040.severity = warning
+# Forward the CancellationToken using WithCancellation()
+dotnet_diagnostic.MA0079.severity = warning
+# Use Regex source generator
+dotnet_diagnostic.MA0110.severity = warning
+# Mark assemblies with CLSCompliant: not applicable for applications
+dotnet_diagnostic.CA1014.severity = none
+# Make exception types public: not applicable for applications
+dotnet_diagnostic.S3871.severity = none
+# Implement exception constructors: library rule, not applicable for application-internal exceptions
+dotnet_diagnostic.RCS1194.severity = none
+dotnet_diagnostic.CA1032.severity = none
 
-# .NET analyzers
-dotnet_diagnostic.CA1305.severity = warning   # Specify IFormatProvider
-dotnet_diagnostic.CA1310.severity = warning   # Specify StringComparison for correctness
-
-# Overrides
+# Test projects: relax rules not applicable to test code
 [tests/**/*.cs]
+# Identifiers should not contain underscores (test method naming convention)
 dotnet_diagnostic.CA1707.severity = none
+# Make type internal (test classes must be public for discovery)
+dotnet_diagnostic.CA1515.severity = none
+# Dispose objects (test infrastructure patterns)
+dotnet_diagnostic.CA2000.severity = none
+# Specify StringComparison (assertion comparisons in tests)
+dotnet_diagnostic.CA1307.severity = none
+# URI-like parameters should not be strings (test inputs)
+dotnet_diagnostic.CA1054.severity = none
+# Naming rule violation (xUnit discovery conventions)
+dotnet_diagnostic.IDE1006.severity = none

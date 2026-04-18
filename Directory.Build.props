@@ -4,19 +4,37 @@
     <Copyright>Copyright © Thomas Fazzari 2026</Copyright>
     <Product>Ciderfy</Product>
     <Description>TUI tool to transfer Spotify playlists to Apple Music without any developer accounts</Description>
-    <VersionPrefix>1.0.7</VersionPrefix>
+    <VersionPrefix>1.0.8</VersionPrefix>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>All</AnalysisMode>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <MeziantouAnalysisMode>None</MeziantouAnalysisMode>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Meziantou.Analyzer" PrivateAssets="all" />
-    <PackageReference Include="Roslynator.Analyzers" PrivateAssets="all" />
+    <PackageReference
+      Include="SonarAnalyzer.CSharp"
+      PrivateAssets="all"
+      IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"
+    />
+    <PackageReference
+      Include="Meziantou.Analyzer"
+      PrivateAssets="all"
+      IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"
+    />
+    <PackageReference
+      Include="Roslynator.Analyzers"
+      PrivateAssets="all"
+      IncludeAssets="runtime; build; native; contentfiles; analyzers; buildtransitive"
+    />
   </ItemGroup>
 
   <ItemGroup Condition="!$(MSBuildProjectName.EndsWith('.Tests'))">

@@ -5,11 +5,11 @@ namespace Ciderfy.Tui;
 /// </summary>
 internal enum LogKind
 {
-    Info,
-    Success,
-    Warning,
-    Error,
-    Separator,
+    Info = 0,
+    Success = 1,
+    Warning = 2,
+    Error = 3,
+    Separator = 4,
 }
 
 /// <summary>
@@ -23,8 +23,8 @@ internal readonly record struct LogEntry(LogKind Kind, string Message);
 internal sealed class LogBuffer(int capacity = 500)
 {
     private readonly LogEntry[] _entries = new LogEntry[capacity];
-    private int _head; // index of the oldest entry
-    private int _count; // number of valid entries
+    private int _head;
+    private int _count;
 
     /// <summary>
     /// Appends a new log entry by overwriting the oldest one when capacity is reached

@@ -41,7 +41,9 @@ internal sealed class PlaylistTransferService(
     )
     {
         // Resolve ISRCs via Deezer
-        var enriched = await deezerIsrcResolver.ResolveIsrcsAsync(tracks, isrcProgress, ct);
+        var enriched = await deezerIsrcResolver
+            .ResolveIsrcsAsync(tracks, isrcProgress, ct)
+            .ConfigureAwait(false);
 
         // Partition tracks by ISRC availability
         var matched = new List<MatchResult.Matched>();
@@ -59,11 +61,9 @@ internal sealed class PlaylistTransferService(
         // Batch ISRC lookup on Apple Music
         var isrcMap =
             withIsrc.Count > 0
-                ? await appleMusicClient.BatchSearchByIsrcAsync(
-                    withIsrc.ConvertAll(t => t.Isrc!),
-                    storefront,
-                    ct
-                )
+                ? await appleMusicClient
+                    .BatchSearchByIsrcAsync(withIsrc.ConvertAll(t => t.Isrc!), storefront, ct)
+                    .ConfigureAwait(false)
                 : [];
 
         foreach (var track in withIsrc)
@@ -90,19 +90,22 @@ internal sealed class PlaylistTransferService(
         var results = new MatchResult[tracks.Count];
         var completed = 0;
 
-        await Parallel.ForEachAsync(
-            Enumerable.Range(0, tracks.Count),
-            new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
-            async (i, token) =>
-            {
-                var track = tracks[i];
-                var result = await matcher.MatchTrackByTextAsync(track, storefront, token);
-                results[i] = result;
+        await Parallel
+            .ForEachAsync(
+                Enumerable.Range(0, tracks.Count),
+                new ParallelOptions { MaxDegreeOfParallelism = 10, CancellationToken = ct },
+                async (i, token) =>
+                {
+                    var track = tracks[i];
+                    results[i] = await matcher
+                        .MatchTrackByTextAsync(track, storefront, token)
+                        .ConfigureAwait(false);
 
-                var currentCount = Interlocked.Increment(ref completed);
-                progress?.Report(new TrackMatchProgress(track, currentCount));
-            }
-        );
+                    var currentCount = Interlocked.Increment(ref completed);
+                    progress?.Report(new TrackMatchProgress(track, currentCount));
+                }
+            )
+            .ConfigureAwait(false);
 
         return [.. results];
     }
@@ -124,11 +127,15 @@ internal sealed class PlaylistTransferService(
             .Select(m => m.AppleTrack.Id)
             .ToList();
 
-        var playlistId = await appleMusicClient.CreatePlaylistAsync(name, ct: ct);
+        var playlistId = await appleMusicClient
+            .CreatePlaylistAsync(name, ct: ct)
+            .ConfigureAwait(false);
         if (playlistId is null)
             return new PlaylistCreateResult(null, false);
 
-        var success = await appleMusicClient.AddTracksToPlaylistAsync(playlistId, trackIds, ct);
+        var success = await appleMusicClient
+            .AddTracksToPlaylistAsync(playlistId, trackIds, ct)
+            .ConfigureAwait(false);
         return new PlaylistCreateResult(playlistId, success);
     }
 }

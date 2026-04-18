@@ -1,0 +1,50 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "build",
+			"command": "make",
+			"args": ["build"],
+			"type": "shell",
+			"group": { "kind": "build", "isDefault": true },
+			"presentation": { "reveal": "silent" },
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "run",
+			"command": "make",
+			"args": ["run"],
+			"type": "shell",
+			"group": "none",
+			"presentation": { "reveal": "always" },
+			"problemMatcher": []
+		},
+		{
+			"label": "test",
+			"command": "make",
+			"args": ["test"],
+			"type": "shell",
+			"group": { "kind": "test", "isDefault": true },
+			"presentation": { "reveal": "always" },
+			"problemMatcher": "$msCompile"
+		},
+		{
+			"label": "format",
+			"command": "make",
+			"args": ["format"],
+			"type": "shell",
+			"group": "none",
+			"presentation": { "reveal": "silent" },
+			"problemMatcher": []
+		},
+		{
+			"label": "lint",
+			"command": "make",
+			"args": ["lint"],
+			"type": "shell",
+			"group": "none",
+			"presentation": { "reveal": "silent" },
+			"problemMatcher": []
+		}
+	]
+}

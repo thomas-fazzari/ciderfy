@@ -8,14 +8,14 @@ namespace Ciderfy.Tui;
 /// </summary>
 internal enum TuiTransferPhase
 {
-    Idle,
-    FetchingPlaylist,
-    ConfirmPlaylist,
-    ResolvingIsrc,
-    ConfirmTextMatch,
-    TextMatching,
-    CreatingPlaylist,
-    Done,
+    Idle = 0,
+    FetchingPlaylist = 1,
+    ConfirmPlaylist = 2,
+    ResolvingIsrc = 3,
+    ConfirmTextMatch = 4,
+    TextMatching = 5,
+    CreatingPlaylist = 6,
+    Done = 7,
 }
 
 /// <summary>

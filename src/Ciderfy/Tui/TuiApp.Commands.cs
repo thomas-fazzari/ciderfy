@@ -13,7 +13,9 @@ internal sealed partial class TuiApp
         if (_commands.TryExecute(cmd, arg))
             return;
 
+#pragma warning disable CA1308
         _logs.Append(LogKind.Error, $"Unknown command: {cmd.ToLowerInvariant()}. Type /help");
+#pragma warning restore CA1308
     }
 
     private void EnsureCommandsRegistered()
@@ -46,7 +48,9 @@ internal sealed partial class TuiApp
             return;
         }
 
+#pragma warning disable CA1308
         _state.Storefront = argument.ToLowerInvariant();
+#pragma warning restore CA1308
         _logs.Append(LogKind.Success, $"Storefront set to {_state.Storefront}");
     }
 

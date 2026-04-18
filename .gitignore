@@ -42,3 +42,6 @@ coverage*.json
 # Tooling
 .husky/_
 .slopwatch/config.json.example
+
+# Node (husky)
+node_modules/

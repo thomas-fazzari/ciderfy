@@ -13,7 +13,9 @@ namespace Ciderfy.Apple;
 /// </remarks>
 internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient httpClient)
 {
+#pragma warning disable S1075
     private const string AppleMusicUrl = "https://music.apple.com";
+#pragma warning restore S1075
     private readonly TokenCache _tokenCache = tokenCache;
     private readonly HttpClient _httpClient = httpClient;
 
@@ -25,7 +27,7 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
         if (_tokenCache.HasValidDeveloperToken)
             return _tokenCache.DeveloperToken!;
 
-        var token = await ExtractDeveloperTokenFromWebAsync(ct);
+        var token = await ExtractDeveloperTokenFromWebAsync(ct).ConfigureAwait(false);
 
         _tokenCache.DeveloperToken = token;
         _tokenCache.DeveloperTokenExpiry =
@@ -46,12 +48,17 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
     /// </remarks>
     private async Task<string> ExtractDeveloperTokenFromWebAsync(CancellationToken ct)
     {
-        var html = await _httpClient.GetStringAsync($"{AppleMusicUrl}/browse", ct);
+        var html = await _httpClient
+            .GetStringAsync(new Uri($"{AppleMusicUrl}/browse"), ct)
+            .ConfigureAwait(false);
 
         var scriptUrls = ScriptSrcRegex()
             .Matches(html)
             .Select(m => m.Groups[1].Value)
-            .Where(url => url.Contains("assets/") || url.Contains("js/"))
+            .Where(url =>
+                url.Contains("assets/", StringComparison.Ordinal)
+                || url.Contains("js/", StringComparison.Ordinal)
+            )
             .ToList();
 
         string? bestCandidate = null;
@@ -63,11 +70,13 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
 
             var fullUrl = scriptUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                 ? scriptUrl
-                : $"{AppleMusicUrl}{scriptUrl}";
+                : AppleMusicUrl + scriptUrl;
 
             try
             {
-                var js = await _httpClient.GetStringAsync(fullUrl, ct);
+                var js = await _httpClient
+                    .GetStringAsync(new Uri(fullUrl), ct)
+                    .ConfigureAwait(false);
 
                 foreach (var token in JwtTokenRegex().Matches(js).Select(m => m.Value))
                 {

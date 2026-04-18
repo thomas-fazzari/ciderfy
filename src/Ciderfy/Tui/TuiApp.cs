@@ -143,19 +143,24 @@ internal sealed partial class TuiApp(
         }
     }
 
-    // Background operations
     private async Task RunAuthAsync(CancellationToken ct)
     {
         try
         {
-            await auth.GetDeveloperTokenAsync(ct);
+            await auth.GetDeveloperTokenAsync(ct).ConfigureAwait(false);
             var needsUserToken = !tokenCache.HasValidUserToken;
             _channel.Writer.TryWrite(new AuthDoneMsg(needsUserToken, null));
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031
         catch (Exception ex)
         {
             _channel.Writer.TryWrite(new AuthDoneMsg(false, ex));
         }
+#pragma warning restore CA1031
     }
 
     private async Task RunFetchPlaylistAsync(List<string> playlistIds, CancellationToken ct)
@@ -163,7 +168,7 @@ internal sealed partial class TuiApp(
         try
         {
             if (!tokenCache.HasValidDeveloperToken)
-                await auth.GetDeveloperTokenAsync(ct);
+                await auth.GetDeveloperTokenAsync(ct).ConfigureAwait(false);
 
             if (!tokenCache.HasValidUserToken)
             {
@@ -179,13 +184,19 @@ internal sealed partial class TuiApp(
             var fetchTasks = playlistIds.Select(id =>
                 transferService.FetchSpotifyPlaylistAsync(id, ct)
             );
-            var playlists = await Task.WhenAll(fetchTasks);
+            var playlists = await Task.WhenAll(fetchTasks).ConfigureAwait(false);
             _channel.Writer.TryWrite(new PlaylistFetchedMsg([.. playlists], null));
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031
         catch (Exception ex)
         {
             _channel.Writer.TryWrite(new PlaylistFetchedMsg([], ex));
         }
+#pragma warning restore CA1031
     }
 
     private async Task RunIsrcMatchAsync(CancellationToken ct)
@@ -196,18 +207,21 @@ internal sealed partial class TuiApp(
                 _channel.Writer.TryWrite(new IsrcProgressMsg(p.Current, p.Total))
             );
 
-            var (matched, unmatched) = await transferService.MatchByIsrcAsync(
-                _state.TransferTracks!,
-                _state.Storefront,
-                progress,
-                ct
-            );
+            var (matched, unmatched) = await transferService
+                .MatchByIsrcAsync(_state.TransferTracks!, _state.Storefront, progress, ct)
+                .ConfigureAwait(false);
             _channel.Writer.TryWrite(new IsrcDoneMsg(matched, unmatched, null));
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031
         catch (Exception ex)
         {
             _channel.Writer.TryWrite(new IsrcDoneMsg([], [], ex));
         }
+#pragma warning restore CA1031
     }
 
     private async Task RunTextMatchAsync(CancellationToken ct)
@@ -220,18 +234,21 @@ internal sealed partial class TuiApp(
                 )
             );
 
-            var results = await transferService.MatchByTextAsync(
-                _state.UnmatchedTracks!,
-                _state.Storefront,
-                progress,
-                ct
-            );
+            var results = await transferService
+                .MatchByTextAsync(_state.UnmatchedTracks!, _state.Storefront, progress, ct)
+                .ConfigureAwait(false);
             _channel.Writer.TryWrite(new TextDoneMsg(results, null));
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031
         catch (Exception ex)
         {
             _channel.Writer.TryWrite(new TextDoneMsg(null, ex));
         }
+#pragma warning restore CA1031
     }
 
     private async Task RunCreatePlaylistAsync(CancellationToken ct)
@@ -239,17 +256,21 @@ internal sealed partial class TuiApp(
         try
         {
             var allResults = BuildAllResults();
-            var result = await transferService.CreatePlaylistAsync(
-                _state.PlaylistName,
-                allResults,
-                ct
-            );
+            var result = await transferService
+                .CreatePlaylistAsync(_state.PlaylistName, allResults, ct)
+                .ConfigureAwait(false);
             _channel.Writer.TryWrite(new PlaylistCreatedMsg(result, allResults, null));
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+#pragma warning disable CA1031
         catch (Exception ex)
         {
             _channel.Writer.TryWrite(new PlaylistCreatedMsg(null, null, ex));
         }
+#pragma warning restore CA1031
     }
 
     // Message handling lives in TuiApp.Messages.cs

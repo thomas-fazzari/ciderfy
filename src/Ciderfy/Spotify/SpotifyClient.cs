@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
@@ -22,7 +23,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
 
     private const string GraphQlEndpoint = "https://api-partner.spotify.com/pathfinder/v2/query";
     private const string ClientTokenEndpoint = "https://clienttoken.spotify.com/v1/clienttoken";
+#pragma warning disable S1075
     private const string SpotifyBaseUrl = "https://open.spotify.com";
+#pragma warning restore S1075
 
     private const string PlaylistQueryHash =
         "bb67e0af06e8d6f52b531f97468ee4acd44cd0f82b988e15c2ea47b1148efc77";
@@ -58,7 +61,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         CancellationToken ct = default
     )
     {
-        await EnsureAuthenticatedAsync(ct);
+        await EnsureAuthenticatedAsync(ct).ConfigureAwait(false);
 
         var variables = new
         {
@@ -68,11 +71,12 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             enableWatchFeedEntrypoint = false,
         };
         using var response = await QueryGraphQlAsync(
-            PlaylistQueryHash,
-            "fetchPlaylist",
-            variables,
-            ct
-        );
+                PlaylistQueryHash,
+                "fetchPlaylist",
+                variables,
+                ct
+            )
+            .ConfigureAwait(false);
 
         return ParsePlaylistResponse(response);
     }
@@ -82,13 +86,15 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         if (_authState is not null)
             return;
 
-        await _authenticationLock.WaitAsync(ct);
+        await _authenticationLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
+#pragma warning disable CA1508
             if (_authState is not null)
+#pragma warning restore CA1508
                 return;
 
-            _authState = await InitializeAsync(ct);
+            _authState = await InitializeAsync(ct).ConfigureAwait(false);
         }
         finally
         {
@@ -102,24 +108,27 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
     /// </summary>
     private async Task<SpotifyAuthState> InitializeAsync(CancellationToken ct)
     {
-        var session = await GetSessionInfoAsync(ct);
-        var access = await GetAccessTokenAsync(ct);
+        var session = await GetSessionInfoAsync(ct).ConfigureAwait(false);
+        var access = await GetAccessTokenAsync(ct).ConfigureAwait(false);
         var clientToken = await GetClientTokenAsync(
-            session.ClientVersion,
-            access.ClientId,
-            access.DeviceId ?? session.DeviceId,
-            ct
-        );
+                session.ClientVersion,
+                access.ClientId,
+                access.DeviceId ?? session.DeviceId,
+                ct
+            )
+            .ConfigureAwait(false);
 
         return new SpotifyAuthState(access.AccessToken, clientToken, session.ClientVersion);
     }
 
     private async Task<SessionInfoState> GetSessionInfoAsync(CancellationToken ct)
     {
-        using var response = await _httpClient.GetAsync(SpotifyBaseUrl, ct);
+        using var response = await _httpClient
+            .GetAsync(new Uri(SpotifyBaseUrl), ct)
+            .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var html = await response.Content.ReadAsStringAsync(ct);
+        var html = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
         string? clientVersion = null;
         var configMatch = AppServerConfigRegex().Match(html);
@@ -141,10 +150,10 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         var url =
             $"{SpotifyBaseUrl}/api/token?reason=init&productType=web-player&totp={totpCode}&totpVer={TotpVersion}&totpServer={totpCode}";
 
-        using var response = await _httpClient.GetAsync(url, ct);
+        using var response = await _httpClient.GetAsync(new Uri(url), ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync(ct);
+        var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);
 
         var tokenResponse = doc.RootElement.Deserialize<AccessTokenResponse>();
@@ -194,10 +203,10 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         request.Headers.Add(HttpHeaderNames.Accept, MimeTypes.Json);
         request.Headers.Add(HttpHeaderNames.UserAgent, UserAgent);
 
-        using var response = await _httpClient.SendAsync(request, ct);
+        using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync(ct);
+        var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);
 
         var clientToken = doc.RootElement.Deserialize<ClientTokenResponse>()?.GrantedToken?.Token;
@@ -236,10 +245,10 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         if (!string.IsNullOrWhiteSpace(authState.ClientVersion))
             request.Headers.Add(SpotifyAppVersionHeader, authState.ClientVersion);
 
-        using var response = await _httpClient.SendAsync(request, ct);
+        using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
-        var json = await response.Content.ReadAsStringAsync(ct);
+        var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         return JsonDocument.Parse(json);
     }
 
@@ -375,8 +384,13 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         return milliseconds.ValueKind switch
         {
             JsonValueKind.Number when milliseconds.TryGetInt32(out var numericMs) => numericMs,
-            JsonValueKind.String when int.TryParse(milliseconds.GetString(), out var stringMs) =>
-                stringMs,
+            JsonValueKind.String
+                when int.TryParse(
+                    milliseconds.GetString(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var stringMs
+                ) => stringMs,
             _ => 0,
         };
     }
@@ -391,7 +405,11 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         string? ClientVersion
     );
 
-    public void Dispose() => _authenticationLock.Dispose();
+    public void Dispose()
+    {
+        _authenticationLock.Dispose();
+        _httpClient.Dispose();
+    }
 
     [GeneratedRegex(
         @"<script id=""appServerConfig"" type=""text/plain"">([^<]+)</script>",

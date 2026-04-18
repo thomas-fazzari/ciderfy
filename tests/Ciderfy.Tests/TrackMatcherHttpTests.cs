@@ -26,7 +26,7 @@ public class TrackMatcherHttpTests
     [Fact]
     public async Task MatchTrackByTextAsync_ReturnsMatched_WhenCandidateFound()
     {
-        var searchJson = """
+        const string searchJson = """
             {
               "results": {
                 "songs": {
@@ -60,7 +60,7 @@ public class TrackMatcherHttpTests
     [Fact]
     public async Task MatchTrackByTextAsync_ReturnsNotFound_WhenNoCandidatesMatch()
     {
-        var emptyJson = """{"results":{"songs":{"data":[]}}}""";
+        const string emptyJson = """{"results":{"songs":{"data":[]}}}""";
 
         using var http = FakeHttpMessageHandler.ReturningJson(emptyJson);
         var track = TrackMetadataFaker
