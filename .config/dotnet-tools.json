@@ -16,6 +16,11 @@
 			"version": "0.2.0",
 			"commands": ["slopwatch"],
 			"rollForward": false
+		},
+		"husky": {
+			"version": "0.9.1",
+			"commands": ["husky"],
+			"rollForward": false
 		}
 	}
 }
