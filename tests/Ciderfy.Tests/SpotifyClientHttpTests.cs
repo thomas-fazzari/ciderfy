@@ -112,6 +112,61 @@ public class SpotifyClientHttpTests
     }
 
     [Fact]
+    public async Task GetPlaylistAsync_UnauthorizedMidSession_InvalidatesStateAndRetries()
+    {
+        const string playlistName = "Refreshed Playlist";
+
+        var playlistJson = $$"""
+            {
+              "data": {
+                "playlistV2": {
+                  "name": "{{playlistName}}",
+                  "content": { "items": [] }
+                }
+              }
+            }
+            """;
+
+        var playlistCallCount = 0;
+        var accessTokenCallCount = 0;
+
+        using var http = new HttpClient(
+            new FakeHttpMessageHandler(request =>
+            {
+                static HttpResponseMessage Ok(string body) =>
+                    new(HttpStatusCode.OK) { Content = new StringContent(body) };
+
+                var uri = request.RequestUri!;
+                if (uri.Host == SpotifyHost && uri.AbsolutePath == "/")
+                    return Ok(SessionHtml);
+                if (
+                    uri.Host == SpotifyHost
+                    && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
+                )
+                {
+                    accessTokenCallCount++;
+                    return Ok(AccessTokenJson);
+                }
+                if (uri.Host == ClientTokenHost)
+                    return Ok(ClientTokenJson);
+
+                // First playlist call returns 401 (stale token), second succeeds
+                playlistCallCount++;
+                if (playlistCallCount == 1)
+                    return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+
+                return Ok(playlistJson);
+            })
+        );
+
+        var playlist = await Client(http).GetPlaylistAsync("playlist123", Ct);
+
+        Assert.Equal(playlistName, playlist.Name);
+        Assert.Equal(2, playlistCallCount);
+        Assert.Equal(2, accessTokenCallCount);
+    }
+
+    [Fact]
     public async Task GetPlaylistAsync_ClientTokenFailure_RetriesAuthOnNextCall()
     {
         const string playlistName = "Recovered Playlist";

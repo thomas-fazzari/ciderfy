@@ -37,7 +37,8 @@ internal sealed class TokenCache
 
     public bool HasValidUserToken =>
         !string.IsNullOrEmpty(UserToken)
-        && (!UserTokenExpiry.HasValue || UserTokenExpiry.Value > DateTimeOffset.UtcNow);
+        && UserTokenExpiry.HasValue
+        && UserTokenExpiry.Value > DateTimeOffset.UtcNow;
 
     public static TokenCache Load() => LoadFromPath(DefaultCachePath);
 

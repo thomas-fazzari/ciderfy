@@ -1,7 +1,9 @@
+using System.Net;
 using Ciderfy.Web;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Polly;
 
 namespace Ciderfy.Apple;
 
@@ -35,16 +37,28 @@ internal static class AppleExtensions
                     HttpClientFactory.ConfigureAppleMusicClient(client);
                 }
             )
-            .ConfigurePrimaryHttpMessageHandler(HttpClientFactory.CreateDecompressionHandler);
-
-        services.AddHttpClient<AppleMusicAuth>(
-            (sp, client) =>
+            .ConfigurePrimaryHttpMessageHandler(HttpClientFactory.CreateDecompressionHandler)
+            .AddStandardResilienceHandler(o =>
             {
-                var options = sp.GetRequiredService<IOptions<AppleMusicAuthOptions>>().Value;
-                client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                HttpClientFactory.ConfigureAppleMusicAuthClient(client);
-            }
-        );
+                // 429 handled manually via AppleMusicRateLimitException
+                o.Retry.ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
+                    .Handle<HttpRequestException>()
+                    .HandleResult(r =>
+                        r.StatusCode >= HttpStatusCode.InternalServerError
+                        || r.StatusCode is HttpStatusCode.RequestTimeout
+                    );
+            });
+
+        services
+            .AddHttpClient<AppleMusicAuth>(
+                (sp, client) =>
+                {
+                    var options = sp.GetRequiredService<IOptions<AppleMusicAuthOptions>>().Value;
+                    client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                    HttpClientFactory.ConfigureAppleMusicAuthClient(client);
+                }
+            )
+            .AddStandardResilienceHandler();
 
         return services;
     }

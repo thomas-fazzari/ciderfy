@@ -63,6 +63,21 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
     {
         await EnsureAuthenticatedAsync(ct).ConfigureAwait(false);
 
+        try
+        {
+            return await FetchPlaylistAsync(playlistId, ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode is HttpStatusCode.Unauthorized)
+        {
+            // Auth state is stale, clear and retry once with fresh tokens
+            InvalidateAuthState();
+            await EnsureAuthenticatedAsync(ct).ConfigureAwait(false);
+            return await FetchPlaylistAsync(playlistId, ct).ConfigureAwait(false);
+        }
+    }
+
+    private async Task<SpotifyPlaylist> FetchPlaylistAsync(string playlistId, CancellationToken ct)
+    {
         var variables = new
         {
             uri = $"spotify:playlist:{playlistId}",
@@ -79,6 +94,19 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             .ConfigureAwait(false);
 
         return ParsePlaylistResponse(response);
+    }
+
+    private void InvalidateAuthState()
+    {
+        _authenticationLock.Wait(CancellationToken.None);
+        try
+        {
+            _authState = null;
+        }
+        finally
+        {
+            _authenticationLock.Release();
+        }
     }
 
     private async Task EnsureAuthenticatedAsync(CancellationToken ct)

@@ -34,7 +34,8 @@ internal static class SpotifyExtensions
             {
                 CookieContainer = sp.GetRequiredService<CookieContainer>(),
                 UseCookies = true,
-            });
+            })
+            .AddStandardResilienceHandler();
 
         return services;
     }

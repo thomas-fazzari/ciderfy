@@ -63,10 +63,10 @@ public class TokenCacheTests
     }
 
     [Fact]
-    public void HasValidUserToken_NoExpiry_ReturnsTrue()
+    public void HasValidUserToken_NoExpiry_ReturnsFalse()
     {
         var cache = new TokenCache { UserToken = "token", UserTokenExpiry = null };
-        Assert.True(cache.HasValidUserToken);
+        Assert.False(cache.HasValidUserToken);
     }
 
     [Fact]
