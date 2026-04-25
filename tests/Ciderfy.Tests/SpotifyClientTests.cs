@@ -7,7 +7,7 @@ namespace Ciderfy.Tests;
 public class SpotifyClientTests
 {
     [Fact]
-    public void ParsePlaylistResponse_ValidResponse_ReturnsNameAndTracks()
+    public void ParsePlaylistPage_ValidResponse_ReturnsNameAndTracks()
     {
         const string json = """
             {
@@ -34,7 +34,7 @@ public class SpotifyClientTests
             """;
 
         using var doc = JsonDocument.Parse(json);
-        var result = SpotifyClient.ParsePlaylistResponse(doc);
+        var result = SpotifyClient.ParsePlaylistPage(doc);
 
         Assert.Equal("My Playlist", result.Name);
         Assert.Single(result.Tracks);
@@ -45,17 +45,17 @@ public class SpotifyClientTests
     }
 
     [Fact]
-    public void ParsePlaylistResponse_MissingDataKey_ReturnsDefaultNameEmptyTracks()
+    public void ParsePlaylistPage_MissingDataKey_ReturnsDefaultNameEmptyTracks()
     {
         using var doc = JsonDocument.Parse("{}");
-        var result = SpotifyClient.ParsePlaylistResponse(doc);
+        var result = SpotifyClient.ParsePlaylistPage(doc);
 
         Assert.Equal("Spotify Import", result.Name);
         Assert.Empty(result.Tracks);
     }
 
     [Fact]
-    public void ParsePlaylistResponse_MissingPlaylistName_UsesDefaultName()
+    public void ParsePlaylistPage_MissingPlaylistName_UsesDefaultName()
     {
         const string json = """
             {
@@ -68,26 +68,26 @@ public class SpotifyClientTests
             """;
 
         using var doc = JsonDocument.Parse(json);
-        var result = SpotifyClient.ParsePlaylistResponse(doc);
+        var result = SpotifyClient.ParsePlaylistPage(doc);
 
         Assert.Equal("Spotify Import", result.Name);
         Assert.Empty(result.Tracks);
     }
 
     [Fact]
-    public void ParsePlaylistResponse_MissingContentKey_ReturnsEmptyTracks()
+    public void ParsePlaylistPage_MissingContentKey_ReturnsEmptyTracks()
     {
         const string json = """{ "data": { "playlistV2": { "name": "My Playlist" } } }""";
 
         using var doc = JsonDocument.Parse(json);
-        var result = SpotifyClient.ParsePlaylistResponse(doc);
+        var result = SpotifyClient.ParsePlaylistPage(doc);
 
         Assert.Equal("My Playlist", result.Name);
         Assert.Empty(result.Tracks);
     }
 
     [Fact]
-    public void ParsePlaylistResponse_SkipsItemsWithMissingTitle()
+    public void ParsePlaylistPage_SkipsItemsWithMissingTitle()
     {
         const string json = """
             {
@@ -105,7 +105,7 @@ public class SpotifyClientTests
             """;
 
         using var doc = JsonDocument.Parse(json);
-        var result = SpotifyClient.ParsePlaylistResponse(doc);
+        var result = SpotifyClient.ParsePlaylistPage(doc);
 
         Assert.Empty(result.Tracks);
     }
@@ -276,5 +276,65 @@ public class SpotifyClientTests
 
         // Both calls happen within the same 30s TOTP window
         Assert.Equal(code1, code2);
+    }
+
+    [Fact]
+    public void ParsePlaylistPage_WithTotalCount_ReturnsTotalCount()
+    {
+        const string json = """
+            {
+              "data": {
+                "playlistV2": {
+                  "name": "Big Playlist",
+                  "content": {
+                    "totalCount": 1308,
+                    "items": [],
+                    "pagingInfo": { "offset": 0, "limit": 300 }
+                  }
+                }
+              }
+            }
+            """;
+
+        using var doc = JsonDocument.Parse(json);
+        var (name, tracks, totalCount) = SpotifyClient.ParsePlaylistPage(doc);
+
+        Assert.Equal("Big Playlist", name);
+        Assert.Empty(tracks);
+        Assert.Equal(1308, totalCount);
+    }
+
+    [Fact]
+    public void ParsePlaylistPage_MissingTotalCount_FallsBackToItemCount()
+    {
+        const string json = """
+            {
+              "data": {
+                "playlistV2": {
+                  "name": "Small Playlist",
+                  "content": {
+                    "items": [
+                      {
+                        "itemV2": {
+                          "data": {
+                            "name": "Song",
+                            "uri": "spotify:track:x1",
+                            "artists": { "items": [{ "profile": { "name": "Artist" } }] },
+                            "trackDuration": { "totalMilliseconds": 200000 }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+            """;
+
+        using var doc = JsonDocument.Parse(json);
+        var (_, tracks, totalCount) = SpotifyClient.ParsePlaylistPage(doc);
+
+        Assert.Single(tracks);
+        Assert.Equal(1, totalCount);
     }
 }

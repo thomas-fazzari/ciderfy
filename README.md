@@ -132,9 +132,7 @@ You can set storefront and playlist naming behavior before transfer using comman
 
 ## Notes and Limitations
 
-- Tokens are cached locally in your application data directory under `Ciderfy/tokens.json`
-- This project relies on third-party services and API behavior that may change
-- Spotify playlist fetch currently allows up to 1000 tracks per call
+- This tool relies on third-party services and API behavior that may change
 - Apple Music developer token extraction is based on current web player assets
 
 ## License

@@ -14,7 +14,12 @@ namespace Ciderfy.Spotify;
 /// Unauthenticated Spotify API client that uses the web player's GraphQL endpoint.
 /// </summary>
 /// <remarks>
-/// Uses the following auth sequence: fetch session info -> obtain access token via TOTP -> get client token
+/// Auth sequence:
+/// <list type="number">
+/// <item>Fetch session info</item>
+/// <item>Obtain access token via TOTP</item>
+/// <item>Get client token</item>
+/// </list>
 /// </remarks>
 internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContainer cookies)
     : IDisposable
@@ -36,6 +41,8 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
 
     private const int TotpVersion = 61;
 
+    private const int PlaylistPageSize = 1000;
+
     // csharpier-ignore-start
     private static readonly byte[] _totpSecret =
     [
@@ -53,9 +60,6 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
     /// <summary>
     /// Fetches a playlist's metadata and tracks from Spotify using the unauthenticated GraphQL API
     /// </summary>
-    /// <remarks>
-    /// Limited to 1000 tracks per request (no pagination)
-    /// </remarks>
     public async Task<SpotifyPlaylist> GetPlaylistAsync(
         string playlistId,
         CancellationToken ct = default
@@ -78,22 +82,39 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
 
     private async Task<SpotifyPlaylist> FetchPlaylistAsync(string playlistId, CancellationToken ct)
     {
-        var variables = new
-        {
-            uri = $"spotify:playlist:{playlistId}",
-            offset = 0,
-            limit = 1000,
-            enableWatchFeedEntrypoint = false,
-        };
-        using var response = await QueryGraphQlAsync(
-                PlaylistQueryHash,
-                "fetchPlaylist",
-                variables,
-                ct
-            )
-            .ConfigureAwait(false);
+        var tracks = new List<SpotifyTrack>();
+        var name = "Spotify Import";
+        var offset = 0;
 
-        return ParsePlaylistResponse(response);
+        while (true)
+        {
+            var variables = new
+            {
+                uri = $"spotify:playlist:{playlistId}",
+                offset,
+                limit = PlaylistPageSize,
+                enableWatchFeedEntrypoint = false,
+            };
+            using var response = await QueryGraphQlAsync(
+                    PlaylistQueryHash,
+                    "fetchPlaylist",
+                    variables,
+                    ct
+                )
+                .ConfigureAwait(false);
+
+            var (pageName, pageTracks, totalCount) = ParsePlaylistPage(response);
+            if (offset == 0)
+                name = pageName;
+
+            tracks.AddRange(pageTracks);
+            offset += PlaylistPageSize;
+
+            if (offset >= totalCount)
+                break;
+        }
+
+        return new SpotifyPlaylist(name, tracks);
     }
 
     private void InvalidateAuthState()
@@ -131,9 +152,16 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
     }
 
     /// <summary>
-    /// Three-step auth: extract client version from the web page,
-    /// obtain an access token using a TOTP code, then request a client token
+    /// Authenticates the client against the Spotify web player.
     /// </summary>
+    /// <remarks>
+    /// Three-step sequence:
+    /// <list type="number">
+    /// <item>Extract client version from the web page</item>
+    /// <item>Obtain an access token using a TOTP code</item>
+    /// <item>Request a client token</item>
+    /// </list>
+    /// </remarks>
     private async Task<SpotifyAuthState> InitializeAsync(CancellationToken ct)
     {
         var session = await GetSessionInfoAsync(ct).ConfigureAwait(false);
@@ -304,7 +332,9 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
         return new Totp(key, step: 30).ComputeTotp();
     }
 
-    internal static SpotifyPlaylist ParsePlaylistResponse(JsonDocument doc)
+    internal static (string Name, List<SpotifyTrack> Tracks, int TotalCount) ParsePlaylistPage(
+        JsonDocument doc
+    )
     {
         var tracks = new List<SpotifyTrack>();
 
@@ -313,7 +343,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             || !data.TryGetProperty("playlistV2", out var playlist)
         )
         {
-            return new SpotifyPlaylist("Spotify Import", tracks);
+            return ("Spotify Import", tracks, 0);
         }
 
         var name = playlist.TryGetProperty("name", out var n)
@@ -325,8 +355,12 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             || !content.TryGetProperty("items", out var items)
         )
         {
-            return new SpotifyPlaylist(name, tracks);
+            return (name, tracks, 0);
         }
+
+        var totalCount = content.TryGetProperty("totalCount", out var tc)
+            ? tc.GetInt32()
+            : items.GetArrayLength();
 
         foreach (var item in items.EnumerateArray())
         {
@@ -335,7 +369,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
                 tracks.Add(track);
         }
 
-        return new SpotifyPlaylist(name, tracks);
+        return (name, tracks, totalCount);
     }
 
     internal static SpotifyTrack? ParsePlaylistItem(JsonElement item)
