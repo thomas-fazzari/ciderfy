@@ -68,13 +68,92 @@ public class DeezerIsrcResolverHttpTests
     [Fact]
     public async Task ResolveIsrcsAsync_ValidResponse_PopulatesIsrc()
     {
-        const string json = """{ "data": [{ "isrc": "GBAYE0601498" }] }""";
+        var track = new TrackMetadata
+        {
+            SpotifyId = "test",
+            Title = "Let It Be",
+            Artist = "The Beatles",
+        };
+        const string json = """
+            {
+              "data": [
+                {
+                  "isrc": "GBAYE0601498",
+                  "title": "Let It Be",
+                  "artist": { "name": "The Beatles" }
+                }
+              ]
+            }
+            """;
         using var client = FakeHttpMessageHandler.ReturningJson(json);
         using var resolver = new DeezerIsrcResolver(client, _fastOptions);
 
-        var results = await resolver.ResolveIsrcsAsync([_track], ct: Ct);
+        var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
 
         Assert.Single(results);
         Assert.Equal("GBAYE0601498", results[0].Isrc);
+    }
+
+    [Fact]
+    public async Task ResolveIsrcsAsync_MultipleResults_ReturnsBestMatch()
+    {
+        var track = new TrackMetadata
+        {
+            SpotifyId = "test",
+            Title = "Let It Be",
+            Artist = "The Beatles",
+        };
+        const string json = """
+            {
+              "data": [
+                {
+                  "isrc": "WRONG001",
+                  "title": "Something Else",
+                  "artist": { "name": "Other Artist" }
+                },
+                {
+                  "isrc": "GBAYE0601498",
+                  "title": "Let It Be",
+                  "artist": { "name": "The Beatles" }
+                }
+              ]
+            }
+            """;
+        using var client = FakeHttpMessageHandler.ReturningJson(json);
+        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+
+        var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
+
+        Assert.Single(results);
+        Assert.Equal("GBAYE0601498", results[0].Isrc);
+    }
+
+    [Fact]
+    public async Task ResolveIsrcsAsync_NoBestMatch_ReturnsNullIsrc()
+    {
+        var track = new TrackMetadata
+        {
+            SpotifyId = "test",
+            Title = "Let It Be",
+            Artist = "The Beatles",
+        };
+        const string json = """
+            {
+              "data": [
+                {
+                  "isrc": "NOMATCH001",
+                  "title": "Xyz Qwz",
+                  "artist": { "name": "Zzz Qqq" }
+                }
+              ]
+            }
+            """;
+        using var client = FakeHttpMessageHandler.ReturningJson(json);
+        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+
+        var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
+
+        Assert.Single(results);
+        Assert.Null(results[0].Isrc);
     }
 }

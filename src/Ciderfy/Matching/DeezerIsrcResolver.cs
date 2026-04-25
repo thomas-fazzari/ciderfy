@@ -16,6 +16,8 @@ internal sealed class DeezerIsrcResolver(
 #pragma warning disable S1075
     private const string SearchUrl = "https://api.deezer.com/search";
 #pragma warning restore S1075
+    private const int SearchResultLimit = 5;
+    private const double MinIsrcMatchScore = 0.5;
 
     private readonly RateLimiter _rateLimiter = new SlidingWindowRateLimiter(
         new SlidingWindowRateLimiterOptions
@@ -66,14 +68,33 @@ internal sealed class DeezerIsrcResolver(
     private async Task<string?> FindIsrcAsync(string title, string artist, CancellationToken ct)
     {
         var query = Uri.EscapeDataString($"{artist} {title}");
-        var url = $"{SearchUrl}?q={query}&limit=1";
+        var url = $"{SearchUrl}?q={query}&limit={SearchResultLimit}";
 
         var json = await GetWithRateLimitAsync(url, ct).ConfigureAwait(false);
         if (json is null)
             return null;
 
         var response = JsonSerializer.Deserialize<DeezerSearchResponse>(json);
-        return response?.Data is { Count: > 0 } data ? data[0].Isrc : null;
+        if (response?.Data is not { Count: > 0 } data)
+            return null;
+
+        var (Isrc, Score) = data.Where(item => item.Isrc is not null)
+            .Select(item =>
+                (
+                    Isrc: item.Isrc!,
+                    Score: (
+                        MatchingWeights.Title
+                        * TrackMatcher.TitleSimilarity(title, item.Title ?? string.Empty)
+                    )
+                        + (
+                            MatchingWeights.Artist
+                            * TrackMatcher.ArtistSimilarity(artist, item.ArtistName ?? string.Empty)
+                        )
+                )
+            )
+            .MaxBy(x => x.Score);
+
+        return Score >= MinIsrcMatchScore ? Isrc : null;
     }
 
     private async Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct)
@@ -105,7 +126,16 @@ internal sealed class DeezerIsrcResolver(
     }
 }
 
-file sealed record DeezerSearchItem([property: JsonPropertyName("isrc")] string? Isrc);
+file sealed record DeezerSearchItem(
+    [property: JsonPropertyName("isrc")] string? Isrc,
+    [property: JsonPropertyName("title")] string? Title,
+    [property: JsonPropertyName("artist")] DeezerArtist? Artist
+)
+{
+    public string? ArtistName => Artist?.Name;
+}
+
+file sealed record DeezerArtist([property: JsonPropertyName("name")] string? Name);
 
 file sealed record DeezerSearchResponse(
     [property: JsonPropertyName("data")] IReadOnlyList<DeezerSearchItem>? Data

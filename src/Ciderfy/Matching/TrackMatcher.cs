@@ -60,7 +60,8 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     {
         var titleScore = TitleSimilarity(spotify.Title, apple.Title);
         var artistScore = ArtistSimilarity(spotify.Artist, apple.Artist);
-        var textScore = (titleScore * 0.6) + (artistScore * 0.4);
+        var textScore =
+            (titleScore * MatchingWeights.Title) + (artistScore * MatchingWeights.Artist);
 
         return textScore * DurationMultiplier(spotify.DurationMs, apple.DurationMs);
     }

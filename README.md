@@ -20,7 +20,7 @@ A .NET 10 TUI tool to transfer Spotify playlists to Apple Music without any deve
   - ISRC-based matching (resolved via the Deezer catalog, since Spotify does not expose ISRCs publicly)
   - Optional fuzzy matching for remaining tracks
 - Automatic Apple Music playlist creation and batched track insertion
-- Token caching to avoid reauthentication
+- Token caching to avoid repeated authentication (user token cached for 6 months)
 
 ## Installation
 
@@ -37,13 +37,13 @@ brew install ciderfy
 
 ## How It Works
 
-Ciderfy fetches Spotify playlists without requiring an API key by using the web player's internal GraphQL endpoint with TOTP-based authentication
+Ciderfy fetches Spotify playlists without an API key via the web player's internal GraphQL endpoint with TOTP-based auth.
 
-An Apple Music developer token is automatically extracted from the web player's JavaScript bundles, removing the need for a $99/year Apple Developer account
+An Apple Music developer token is automatically extracted from the web player's JS bundles, no $99/year Apple Developer account needed.
 
-ISRCs (International Standard Recording Codes) are then resolved through the Deezer catalog and used to find exact matches in the Apple Music catalog
+ISRCs are resolved through the Deezer catalog (Spotify does not expose them publicly) by scoring candidates against the original title and artist, then used to find exact matches in the Apple Music catalog.
 
-Tracks that weren't matched can then go through an optional fuzzy matching pass that scores title and artist similarity using Jaro-Winkler, then scales the result down based on track duration difference to reduce false positives
+Tracks without an ISRC match can go through an optional fuzzy pass using Jaro-Winkler similarity, penalized by duration difference to reduce false positives.
 
 ### Transfer Flow
 
@@ -95,9 +95,9 @@ Then follow the prompt:
    MusicKit.getInstance().musicUserToken;
    ```
 
-4. Paste the returned token into Ciderfy, it will then be cached
+4. Paste the returned token into Ciderfy (cached for 6 months)
 
-Ciderfy will also automatically fetch and cache a valid Apple Music developer token if it isn't already in cache
+The tool will automatically fetch and cache a valid Apple Music developer token if needed.
 
 ## Usage
 

@@ -13,7 +13,8 @@ namespace Ciderfy.Tests;
 public class PlaylistTransferServiceHttpTests
 {
     private const string DeezerNoIsrc = """{"data": []}""";
-    private const string DeezerWithIsrc = """{"data": [{"isrc": "USABC1234567"}]}""";
+    private const string DeezerWithIsrc =
+        """{"data": [{"isrc": "USABC1234567", "title": "Fortunate Son", "artist": {"name": "Creedence Clearwater Revival"}}]}""";
     private const string AmNoResults = """{"results":{"songs":{"data":[]}}}""";
 
     private const string AmIsrcTrack = """
