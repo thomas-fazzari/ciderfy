@@ -33,6 +33,7 @@ internal static class AppleExtensions
                 (sp, client) =>
                 {
                     var options = sp.GetRequiredService<IOptions<AppleMusicClientOptions>>().Value;
+                    client.BaseAddress = new Uri(options.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
                     HttpClientFactory.ConfigureAppleMusicClient(client);
                 }

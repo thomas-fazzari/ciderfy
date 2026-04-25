@@ -15,7 +15,7 @@ public class TokenCacheTests
     [Fact]
     public void HasValidDeveloperToken_EmptyToken_ReturnsFalse()
     {
-        var cache = new TokenCache { DeveloperToken = "" };
+        var cache = new TokenCache { DeveloperToken = string.Empty };
         Assert.False(cache.HasValidDeveloperToken);
     }
 
@@ -58,7 +58,7 @@ public class TokenCacheTests
     [Fact]
     public void HasValidUserToken_EmptyToken_ReturnsFalse()
     {
-        var cache = new TokenCache { UserToken = "" };
+        var cache = new TokenCache { UserToken = string.Empty };
         Assert.False(cache.HasValidUserToken);
     }
 

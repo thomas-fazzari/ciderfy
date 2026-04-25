@@ -2,6 +2,7 @@ using System.Buffers.Text;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Apple;
 
@@ -11,11 +12,13 @@ namespace Ciderfy.Apple;
 /// <remarks>
 /// Token is cached in <see cref="TokenCache"/> and reused until it expires
 /// </remarks>
-internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient httpClient)
+internal sealed partial class AppleMusicAuth(
+    TokenCache tokenCache,
+    HttpClient httpClient,
+    IOptions<AppleMusicAuthOptions> options
+)
 {
-#pragma warning disable S1075
-    private const string AppleMusicUrl = "https://music.apple.com";
-#pragma warning restore S1075
+    private readonly AppleMusicAuthOptions _options = options.Value;
     private readonly TokenCache _tokenCache = tokenCache;
     private readonly HttpClient _httpClient = httpClient;
 
@@ -49,7 +52,7 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
     private async Task<string> ExtractDeveloperTokenFromWebAsync(CancellationToken ct)
     {
         var html = await _httpClient
-            .GetStringAsync(new Uri($"{AppleMusicUrl}/browse"), ct)
+            .GetStringAsync(new Uri($"{_options.BaseUrl}/browse"), ct)
             .ConfigureAwait(false);
 
         var scriptUrls = ScriptSrcRegex()
@@ -70,7 +73,7 @@ internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient h
 
             var fullUrl = scriptUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                 ? scriptUrl
-                : AppleMusicUrl + scriptUrl;
+                : _options.BaseUrl + scriptUrl;
 
             try
             {

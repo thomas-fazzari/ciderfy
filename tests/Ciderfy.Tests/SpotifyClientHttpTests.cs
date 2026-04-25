@@ -2,6 +2,7 @@ using System.Net;
 using System.Text;
 using Ciderfy.Spotify;
 using Ciderfy.Tests.Fakers;
+using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Ciderfy.Tests;
@@ -16,7 +17,8 @@ public class SpotifyClientHttpTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private static SpotifyClient Client(HttpClient http) => new(http, new CookieContainer());
+    private static SpotifyClient Client(HttpClient http) =>
+        new(http, new CookieContainer(), Options.Create(new SpotifyClientOptions()));
 
     private static string BuildSessionHtml()
     {

@@ -6,6 +6,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Ciderfy.Web;
+using Microsoft.Extensions.Options;
 using OtpNet;
 
 namespace Ciderfy.Spotify;
@@ -21,21 +22,17 @@ namespace Ciderfy.Spotify;
 /// <item>Get client token</item>
 /// </list>
 /// </remarks>
-internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContainer cookies)
-    : IDisposable
+internal sealed partial class SpotifyClient(
+    HttpClient httpClient,
+    CookieContainer cookies,
+    IOptions<SpotifyClientOptions> options
+) : IDisposable
 {
     private const string UserAgent = HttpClientFactory.SpotifyUserAgent;
-
-    private const string GraphQlEndpoint = "https://api-partner.spotify.com/pathfinder/v2/query";
-    private const string ClientTokenEndpoint = "https://clienttoken.spotify.com/v1/clienttoken";
-#pragma warning disable S1075
-    private const string SpotifyBaseUrl = "https://open.spotify.com";
-#pragma warning restore S1075
 
     private const string PlaylistQueryHash =
         "bb67e0af06e8d6f52b531f97468ee4acd44cd0f82b988e15c2ea47b1148efc77";
 
-    private const string ClientTokenAuthority = "clienttoken.spotify.com";
     private const string SpotifyClientTokenHeader = "Client-Token";
     private const string SpotifyAppVersionHeader = "Spotify-App-Version";
 
@@ -53,6 +50,8 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
 
     private readonly HttpClient _httpClient = httpClient;
     private readonly CookieContainer _cookies = cookies;
+    private readonly SpotifyClientOptions _options = options.Value;
+    private readonly string _clientTokenAuthority = new Uri(options.Value.ClientTokenEndpoint).Host;
     private readonly SemaphoreSlim _authenticationLock = new(1, 1);
 
     private SpotifyAuthState? _authState;
@@ -180,7 +179,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
     private async Task<SessionInfoState> GetSessionInfoAsync(CancellationToken ct)
     {
         using var response = await _httpClient
-            .GetAsync(new Uri(SpotifyBaseUrl), ct)
+            .GetAsync(new Uri(_options.WebBaseUrl), ct)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
@@ -204,7 +203,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
     {
         var totpCode = GenerateTotpCode();
         var url =
-            $"{SpotifyBaseUrl}/api/token?reason=init&productType=web-player&totp={totpCode}&totpVer={TotpVersion}&totpServer={totpCode}";
+            $"{_options.WebBaseUrl}/api/token?reason=init&productType=web-player&totp={totpCode}&totpVer={TotpVersion}&totpServer={totpCode}";
 
         using var response = await _httpClient.GetAsync(new Uri(url), ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -252,10 +251,10 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             }
         );
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, ClientTokenEndpoint);
+        using var request = new HttpRequestMessage(HttpMethod.Post, _options.ClientTokenEndpoint);
         request.Content = new StringContent(payload, Encoding.UTF8);
         request.Content.Headers.ContentType = new MediaTypeHeaderValue(MimeTypes.Json);
-        request.Headers.Add(HttpHeaderNames.Authority, ClientTokenAuthority);
+        request.Headers.Add(HttpHeaderNames.Authority, _clientTokenAuthority);
         request.Headers.Add(HttpHeaderNames.Accept, MimeTypes.Json);
         request.Headers.Add(HttpHeaderNames.UserAgent, UserAgent);
 
@@ -294,7 +293,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
             }
         );
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, GraphQlEndpoint);
+        using var request = new HttpRequestMessage(HttpMethod.Post, _options.GraphQlEndpoint);
         request.Content = new StringContent(serialized, Encoding.UTF8, MimeTypes.Json);
         request.Headers.Add(HttpHeaderNames.Authorization, $"Bearer {authState.AccessToken}");
         request.Headers.Add(SpotifyClientTokenHeader, authState.ClientToken);
@@ -310,7 +309,7 @@ internal sealed partial class SpotifyClient(HttpClient httpClient, CookieContain
 
     private string? ExtractDeviceIdFromCookies()
     {
-        var cookieCollection = _cookies.GetCookies(new Uri(SpotifyBaseUrl));
+        var cookieCollection = _cookies.GetCookies(new Uri(_options.WebBaseUrl));
         return cookieCollection["sp_t"]?.Value;
     }
 

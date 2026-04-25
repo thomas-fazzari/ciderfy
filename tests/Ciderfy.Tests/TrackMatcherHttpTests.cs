@@ -20,8 +20,11 @@ public class TrackMatcherHttpTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
-    private TrackMatcher Matcher(HttpClient http) =>
-        new(new AppleMusicClient(http, _fastOptions, _tokenCache));
+    private TrackMatcher Matcher(HttpClient http)
+    {
+        http.BaseAddress = new Uri(_fastOptions.Value.BaseUrl);
+        return new(new AppleMusicClient(http, _fastOptions, _tokenCache));
+    }
 
     [Fact]
     public async Task MatchTrackByTextAsync_ReturnsMatched_WhenCandidateFound()

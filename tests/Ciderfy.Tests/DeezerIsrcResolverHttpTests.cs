@@ -16,11 +16,17 @@ public class DeezerIsrcResolverHttpTests
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
+    private static DeezerIsrcResolver Resolver(HttpClient http)
+    {
+        http.BaseAddress = new Uri(_fastOptions.Value.BaseUrl);
+        return new DeezerIsrcResolver(http, _fastOptions);
+    }
+
     [Fact]
     public async Task ResolveIsrcsAsync_HttpError_ReturnsTrackWithNullIsrc()
     {
         using var client = FakeHttpMessageHandler.Returning(HttpStatusCode.InternalServerError);
-        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+        using var resolver = Resolver(client);
 
         var results = await resolver.ResolveIsrcsAsync([_track], ct: Ct);
 
@@ -32,7 +38,7 @@ public class DeezerIsrcResolverHttpTests
     public async Task ResolveIsrcsAsync_HttpRequestException_ReturnsTrackWithNullIsrc()
     {
         using var client = FakeHttpMessageHandler.ThrowingHttpRequestException();
-        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+        using var resolver = Resolver(client);
 
         var results = await resolver.ResolveIsrcsAsync([_track], ct: Ct);
 
@@ -44,7 +50,7 @@ public class DeezerIsrcResolverHttpTests
     public async Task ResolveIsrcsAsync_TimeoutCanceledException_ReturnsTrackWithNullIsrc()
     {
         using var client = FakeHttpMessageHandler.ThrowingTimeoutCanceledException();
-        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+        using var resolver = Resolver(client);
 
         var results = await resolver.ResolveIsrcsAsync([_track], ct: Ct);
 
@@ -57,7 +63,7 @@ public class DeezerIsrcResolverHttpTests
     {
         const string json = """{ "data": [] }""";
         using var client = FakeHttpMessageHandler.ReturningJson(json);
-        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+        using var resolver = Resolver(client);
 
         var results = await resolver.ResolveIsrcsAsync([_track], ct: Ct);
 
@@ -86,7 +92,7 @@ public class DeezerIsrcResolverHttpTests
             }
             """;
         using var client = FakeHttpMessageHandler.ReturningJson(json);
-        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+        using var resolver = Resolver(client);
 
         var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
 
@@ -120,7 +126,7 @@ public class DeezerIsrcResolverHttpTests
             }
             """;
         using var client = FakeHttpMessageHandler.ReturningJson(json);
-        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+        using var resolver = Resolver(client);
 
         var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
 
@@ -149,7 +155,7 @@ public class DeezerIsrcResolverHttpTests
             }
             """;
         using var client = FakeHttpMessageHandler.ReturningJson(json);
-        using var resolver = new DeezerIsrcResolver(client, _fastOptions);
+        using var resolver = Resolver(client);
 
         var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
 

@@ -27,9 +27,6 @@ internal sealed class AppleMusicClient(
     TokenCache tokenCache
 ) : IDisposable
 {
-#pragma warning disable S1075
-    private const string ApiBaseUrl = "https://api.music.apple.com/v1";
-#pragma warning restore S1075
     private const string MusicUserTokenHeader = "Music-User-Token";
 
     private readonly HttpClient _httpClient = httpClient;
@@ -61,7 +58,7 @@ internal sealed class AppleMusicClient(
             ct.ThrowIfCancellationRequested();
 
             var joined = string.Join(',', batch);
-            var url = $"{ApiBaseUrl}/catalog/{storefront}/songs?filter[isrc]={joined}";
+            var url = $"catalog/{storefront}/songs?filter[isrc]={joined}";
             var json = await GetWithRateLimitAsync(url, authHeaders, ct).ConfigureAwait(false);
 
             if (json is null)
@@ -92,8 +89,7 @@ internal sealed class AppleMusicClient(
         var authHeaders = GenerateAuthHeaders(requireUserToken: false);
 
         var encodedQuery = Uri.EscapeDataString(query);
-        var url =
-            $"{ApiBaseUrl}/catalog/{storefront}/search?types=songs&limit=10&term={encodedQuery}";
+        var url = $"catalog/{storefront}/search?types=songs&limit=10&term={encodedQuery}";
         var json = await GetWithRateLimitAsync(url, authHeaders, ct).ConfigureAwait(false);
         var tracks = new List<AppleMusicTrack>();
 
@@ -127,6 +123,8 @@ internal sealed class AppleMusicClient(
         CancellationToken ct = default
     )
     {
+        const string url = "me/library/playlists";
+
         var authHeaders = GenerateAuthHeaders(requireUserToken: true);
 
         var payload = new
@@ -139,7 +137,6 @@ internal sealed class AppleMusicClient(
         };
 
         var json = JsonSerializer.Serialize(payload);
-        var url = $"{ApiBaseUrl}/me/library/playlists";
 
         var responseJson = await PostWithRateLimitAsync(url, json, authHeaders, ct)
             .ConfigureAwait(false);
@@ -172,7 +169,7 @@ internal sealed class AppleMusicClient(
             var payload = new { data = batch.Select(id => new { id, type = "songs" }).ToArray() };
 
             var json = JsonSerializer.Serialize(payload);
-            var url = $"{ApiBaseUrl}/me/library/playlists/{playlistId}/tracks";
+            var url = $"me/library/playlists/{playlistId}/tracks";
 
             var response = await PostWithRateLimitAsync(url, json, authHeaders, ct)
                 .ConfigureAwait(false);

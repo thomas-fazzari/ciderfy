@@ -21,7 +21,11 @@ public class AppleMusicClientHttpTests
         UserTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
     };
 
-    private AppleMusicClient Client(HttpClient http) => new(http, _fastOptions, _tokenCache);
+    private AppleMusicClient Client(HttpClient http)
+    {
+        http.BaseAddress = new Uri(_fastOptions.Value.BaseUrl);
+        return new(http, _fastOptions, _tokenCache);
+    }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 

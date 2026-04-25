@@ -53,9 +53,15 @@ public class PlaylistTransferServiceHttpTests
         HttpClient deezerHttp
     )
     {
+        deezerHttp.BaseAddress = new Uri(_fastDeezerOptions.Value.BaseUrl);
+        amHttp.BaseAddress = new Uri(_fastAmOptions.Value.BaseUrl);
         var amClient = new AppleMusicClient(amHttp, _fastAmOptions, _tokenCache);
         return new PlaylistTransferService(
-            new SpotifyClient(spotifyHttp, new CookieContainer()),
+            new SpotifyClient(
+                spotifyHttp,
+                new CookieContainer(),
+                Options.Create(new SpotifyClientOptions())
+            ),
             amClient,
             new TrackMatcher(amClient),
             new DeezerIsrcResolver(deezerHttp, _fastDeezerOptions)

@@ -6,6 +6,9 @@ internal sealed class DeezerClientOptions
 {
     public const string SectionName = "Deezer";
 
+    [Required]
+    public string BaseUrl { get; init; } = "https://api.deezer.com/";
+
     [Range(1, int.MaxValue)]
     public int TimeoutSeconds { get; init; } = 15;
 

@@ -13,9 +13,6 @@ internal sealed class DeezerIsrcResolver(
     IOptions<DeezerClientOptions> options
 ) : IDisposable
 {
-#pragma warning disable S1075
-    private const string SearchUrl = "https://api.deezer.com/search";
-#pragma warning restore S1075
     private const int SearchResultLimit = 5;
     private const double MinIsrcMatchScore = 0.5;
 
@@ -68,7 +65,7 @@ internal sealed class DeezerIsrcResolver(
     private async Task<string?> FindIsrcAsync(string title, string artist, CancellationToken ct)
     {
         var query = Uri.EscapeDataString($"{artist} {title}");
-        var url = $"{SearchUrl}?q={query}&limit={SearchResultLimit}";
+        var url = $"search?q={query}&limit={SearchResultLimit}";
 
         var json = await GetWithRateLimitAsync(url, ct).ConfigureAwait(false);
         if (json is null)
@@ -103,7 +100,9 @@ internal sealed class DeezerIsrcResolver(
 
         try
         {
-            using var response = await httpClient.GetAsync(new Uri(url), ct).ConfigureAwait(false);
+            using var response = await httpClient
+                .GetAsync(new Uri(url, UriKind.Relative), ct)
+                .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
                 return null;
