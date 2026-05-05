@@ -27,7 +27,7 @@ jobs:
         run: dotnet dotnet-outdated --upgrade --version-lock Minor
 
       - name: Format
-        run: dotnet tool run csharpier .
+        run: dotnet tool run csharpier format .
 
       - name: Check for changes
         id: changes
