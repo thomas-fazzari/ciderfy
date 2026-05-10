@@ -24,23 +24,30 @@ internal sealed class TuiController(
     private readonly Dictionary<string, Action<string?>> _commands = new(
         StringComparer.OrdinalIgnoreCase
     );
+    private string? _selectedCommandSuggestionCompletion;
 
     internal LogBuffer Logs { get; } = new();
     internal StringBuilder InputBuffer { get; } = new();
     internal TuiState State { get; } = new();
     internal TuiTransferSession TransferSession { get; } = new();
 
+    internal IReadOnlyList<TuiCommandSuggestion> CommandSuggestions =>
+        TuiCommands.GetSuggestions(InputBuffer.ToString(), State.AwaitingUserToken);
+
+    internal int SelectedCommandSuggestionIndex =>
+        GetSelectedCommandSuggestionIndex(CommandSuggestions);
+
     internal void RegisterCommands()
     {
-        Register(_ => RequestQuit(), "/quit", "/exit", "/q");
-        Register(_ => ToggleHelp(), "/help", "/h");
-        Register(_ => Logs.Append(LogKind.Info, StatusSummary()), "/status");
-        Register(HandleStorefrontCommand, "/storefront", "/sf");
-        Register(HandleNameCommand, "/name");
-        Register(HandleAuthCommand, "/auth");
-        Register(_ => HandleConfigCommand(), "/config", "/cfg");
-        Register(HandleAddCommand, "/add");
-        Register(_ => HandleRunCommand(), "/run");
+        Register(_ => RequestQuit(), TuiCommands.Quit, TuiCommands.Exit, TuiCommands.QuitShort);
+        Register(_ => ToggleHelp(), TuiCommands.Help, TuiCommands.HelpShort);
+        Register(_ => Logs.Append(LogKind.Info, StatusSummary()), TuiCommands.Status);
+        Register(HandleStorefrontCommand, TuiCommands.Storefront, TuiCommands.StorefrontShort);
+        Register(HandleNameCommand, TuiCommands.Name);
+        Register(HandleAuthCommand, TuiCommands.Auth);
+        Register(_ => HandleConfigCommand(), TuiCommands.Config, TuiCommands.ConfigShort);
+        Register(HandleAddCommand, TuiCommands.Add);
+        Register(_ => HandleRunCommand(), TuiCommands.Run);
     }
 
     internal void ProcessMessage(TuiMessage msg)
@@ -251,23 +258,101 @@ internal sealed class TuiController(
             case ConsoleKey.Enter:
                 HandleEnter();
                 break;
+            case ConsoleKey.Tab:
+                CompleteCommandSuggestion();
+                break;
+            case ConsoleKey.UpArrow:
+                MoveCommandSuggestionSelection(-1);
+                break;
+            case ConsoleKey.DownArrow:
+                MoveCommandSuggestionSelection(1);
+                break;
             case ConsoleKey.Backspace:
                 if (InputBuffer.Length > 0)
                     InputBuffer.Remove(InputBuffer.Length - 1, 1);
+                ClampCommandSuggestionSelection();
                 break;
             case ConsoleKey.Escape:
                 HandleEscape();
                 break;
             default:
                 if (key.KeyChar >= 32)
+                {
                     InputBuffer.Append(key.KeyChar);
+                    ClampCommandSuggestionSelection();
+                }
                 break;
         }
     }
 
+    private void MoveCommandSuggestionSelection(int delta)
+    {
+        var suggestions = CommandSuggestions;
+        if (suggestions.Count == 0)
+        {
+            _selectedCommandSuggestionCompletion = null;
+            return;
+        }
+
+        var selectedIndex = GetSelectedCommandSuggestionIndex(suggestions);
+        var nextIndex = Math.Clamp(selectedIndex + delta, 0, suggestions.Count - 1);
+        _selectedCommandSuggestionCompletion = suggestions[nextIndex].Completion;
+    }
+
+    private void ClampCommandSuggestionSelection()
+    {
+        var suggestions = CommandSuggestions;
+        if (suggestions.Count == 0)
+        {
+            _selectedCommandSuggestionCompletion = null;
+            return;
+        }
+
+        if (
+            GetSelectedCommandSuggestionIndex(suggestions) == 0
+            && !IsSelectedCommandSuggestion(suggestions[0])
+        )
+        {
+            _selectedCommandSuggestionCompletion = suggestions[0].Completion;
+        }
+    }
+
+    private void CompleteCommandSuggestion()
+    {
+        var suggestions = CommandSuggestions;
+        if (suggestions.Count == 0)
+            return;
+
+        var selectedSuggestion = suggestions[GetSelectedCommandSuggestionIndex(suggestions)];
+        InputBuffer.Clear().Append(CompleteWithTrailingSpace(selectedSuggestion.Completion));
+        _selectedCommandSuggestionCompletion = selectedSuggestion.Completion;
+        ClampCommandSuggestionSelection();
+    }
+
+    private static string CompleteWithTrailingSpace(string completion) =>
+        completion.EndsWith(' ') ? completion : completion + ' ';
+
+    private int GetSelectedCommandSuggestionIndex(IReadOnlyList<TuiCommandSuggestion> suggestions)
+    {
+        if (suggestions.Count == 0)
+            return 0;
+
+        for (var i = 0; i < suggestions.Count; i++)
+        {
+            if (IsSelectedCommandSuggestion(suggestions[i]))
+                return i;
+        }
+
+        return 0;
+    }
+
+    private bool IsSelectedCommandSuggestion(TuiCommandSuggestion suggestion) =>
+        suggestion.Completion == _selectedCommandSuggestionCompletion;
+
     private void HandleEscape()
     {
         InputBuffer.Clear();
+        _selectedCommandSuggestionCompletion = null;
         if (!State.AwaitingUserToken)
             return;
 
@@ -320,6 +405,7 @@ internal sealed class TuiController(
 
         var raw = InputBuffer.ToString();
         InputBuffer.Clear();
+        _selectedCommandSuggestionCompletion = null;
 
         if (State.AwaitingUserToken)
         {

@@ -25,10 +25,7 @@ internal sealed partial class TuiApp
     private const int OuterPanelBorderHeight = 2;
 
     private int CurrentFixedChromeHeight =>
-        GetFixedChromeHeight(
-            BannerSection.GetHeight(CurrentContentWidth),
-            GetStatusSectionHeight(CurrentContentWidth)
-        );
+        GetCurrentFixedChromeHeight(Console.WindowHeight, CurrentContentWidth);
 
     private static int CurrentWindowWidth => Math.Max(MinWindowWidth, Console.WindowWidth);
 
@@ -66,9 +63,15 @@ internal sealed partial class TuiApp
         var contentWidth = GetContentWidth(width);
         var bannerHeight = BannerSection.GetHeight(contentWidth);
         var statusSectionHeight = GetStatusSectionHeight(contentWidth);
+        var (suggestions, selectedSuggestionIndex) = GetVisibleCommandSuggestions(
+            height,
+            bannerHeight,
+            statusSectionHeight
+        );
+        var footerHeight = GetFooterHeight(suggestions.Count);
         var contentHeight = Math.Max(
             MinContentHeight,
-            height - GetFixedChromeHeight(bannerHeight, statusSectionHeight)
+            height - GetFixedChromeHeight(bannerHeight, statusSectionHeight, footerHeight)
         );
 
         var rows = new List<Layout>
@@ -81,11 +84,7 @@ internal sealed partial class TuiApp
             rows.Add(new Layout(RegionBadgesAndStepper).Size(statusSectionHeight));
 
         rows.Add(new Layout(RegionMain));
-        rows.Add(
-            new Layout(RegionFooter).Size(
-                ShowInput ? InputSectionHeight + FooterHeight : FooterHeight
-            )
-        );
+        rows.Add(new Layout(RegionFooter).Size(footerHeight));
 
         var layout = new Layout(RegionRoot).SplitRows([.. rows]);
 
@@ -97,7 +96,17 @@ internal sealed partial class TuiApp
 
         layout[RegionMain].Update(BuildMainContent(contentWidth, contentHeight));
 
-        layout[RegionFooter].Update(new Rows(BuildFooterItems(contentWidth, contentHeight)));
+        layout[RegionFooter]
+            .Update(
+                new Rows(
+                    BuildFooterItems(
+                        contentWidth,
+                        contentHeight,
+                        suggestions,
+                        selectedSuggestionIndex
+                    )
+                )
+            );
 
         return new Panel(layout)
         {
@@ -109,13 +118,77 @@ internal sealed partial class TuiApp
         };
     }
 
-    private int GetFixedChromeHeight(int bannerHeight, int statusSectionHeight) =>
+    private static int GetFixedChromeHeight(
+        int bannerHeight,
+        int statusSectionHeight,
+        int footerHeight
+    ) =>
         bannerHeight
         + SeparatorHeight
         + statusSectionHeight
-        + FooterHeight
-        + (ShowInput ? InputSectionHeight : 0)
+        + footerHeight
         + OuterPanelBorderHeight;
+
+    private int GetCurrentFixedChromeHeight(int windowHeight, int contentWidth)
+    {
+        var bannerHeight = BannerSection.GetHeight(contentWidth);
+        var statusSectionHeight = GetStatusSectionHeight(contentWidth);
+        var suggestionCount = GetVisibleCommandSuggestions(
+            windowHeight,
+            bannerHeight,
+            statusSectionHeight
+        ).Suggestions.Count;
+
+        return GetFixedChromeHeight(
+            bannerHeight,
+            statusSectionHeight,
+            GetFooterHeight(suggestionCount)
+        );
+    }
+
+    private int GetFooterHeight(int suggestionCount) =>
+        FooterHeight
+        + (
+            ShowInput ? InputSectionHeight + CommandSuggestionSection.GetHeight(suggestionCount) : 0
+        );
+
+    private (
+        IReadOnlyList<TuiCommandSuggestion> Suggestions,
+        int SelectedIndex
+    ) GetVisibleCommandSuggestions(int windowHeight, int bannerHeight, int statusSectionHeight)
+    {
+        var suggestions = Controller.CommandSuggestions;
+        if (!ShowInput || suggestions.Count == 0)
+            return ([], 0);
+
+        var mandatoryChromeHeight =
+            bannerHeight
+            + SeparatorHeight
+            + statusSectionHeight
+            + FooterHeight
+            + InputSectionHeight
+            + OuterPanelBorderHeight;
+        var availableHeight = windowHeight - mandatoryChromeHeight - MinContentHeight;
+        var visibleCount = CommandSuggestionSection.GetVisibleCount(
+            suggestions.Count,
+            availableHeight
+        );
+
+        if (visibleCount == 0)
+            return ([], 0);
+
+        var selectedIndex = Controller.SelectedCommandSuggestionIndex;
+        var firstVisibleIndex = Math.Clamp(
+            selectedIndex - visibleCount + 1,
+            0,
+            suggestions.Count - visibleCount
+        );
+
+        return (
+            suggestions.Skip(firstVisibleIndex).Take(visibleCount).ToArray(),
+            selectedIndex - firstVisibleIndex
+        );
+    }
 
     private int GetStatusSectionHeight(int contentWidth) =>
         ShouldShowStatusSection(contentWidth) ? 4 : 0;
@@ -123,13 +196,29 @@ internal sealed partial class TuiApp
     private static int GetContentWidth(int width) =>
         Math.Max(MinContentWidth, width - ContentHorizontalPadding);
 
-    private List<IRenderable> BuildFooterItems(int contentWidth, int contentHeight)
+    private List<IRenderable> BuildFooterItems(
+        int contentWidth,
+        int contentHeight,
+        IReadOnlyList<TuiCommandSuggestion> suggestions,
+        int selectedSuggestionIndex
+    )
     {
         var state = Controller.State;
         var items = new List<IRenderable>(ShowInput ? 3 : 1);
 
         if (ShowInput)
         {
+            if (suggestions.Count > 0)
+            {
+                items.Add(
+                    CommandSuggestionSection.Render(
+                        suggestions,
+                        selectedSuggestionIndex,
+                        contentWidth
+                    )
+                );
+            }
+
             items.Add(BuildInputRenderable(contentWidth));
             items.Add(new Text(string.Empty));
         }

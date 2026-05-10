@@ -20,6 +20,7 @@ A .NET 10 TUI tool to transfer Spotify playlists to Apple Music without any deve
   - ISRC-based matching (resolved via the Deezer catalog, since Spotify does not expose ISRCs publicly)
   - Optional fuzzy matching for remaining tracks
 - Automatic Apple Music playlist creation and batched track insertion
+- Command hints while typing `/`, with arrow navigation and `Tab` autocomplete
 - Token caching to avoid repeated authentication (user token cached for 6 months)
 
 ## Installation
