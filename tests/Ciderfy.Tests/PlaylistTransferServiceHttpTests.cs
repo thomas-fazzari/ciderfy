@@ -181,11 +181,13 @@ public class PlaylistTransferServiceHttpTests
             new FakeHttpMessageHandler(request =>
             {
                 var path = request.RequestUri!.AbsolutePath;
+
                 if (path.EndsWith("/playlists", StringComparison.Ordinal))
                     return Ok("""{"data": [{"id": "pl-789"}]}""");
-                if (path.EndsWith("/tracks", StringComparison.Ordinal))
-                    return Ok("{}");
-                throw new InvalidOperationException($"Unexpected AM path: {path}");
+
+                return path.EndsWith("/tracks", StringComparison.Ordinal)
+                    ? Ok("{}")
+                    : throw new InvalidOperationException($"Unexpected AM path: {path}");
             })
         );
 

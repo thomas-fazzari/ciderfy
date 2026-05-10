@@ -214,7 +214,7 @@ public class TokenCacheTests
                 DeveloperTokenExpiry = DateTimeOffset.UtcNow.AddHours(1),
             };
 
-            var error = Record.Exception(() => cache.Save());
+            var error = Record.Exception(cache.Save);
 
             Assert.Null(error);
             Assert.False(File.Exists($"{destinationDirectory}.tmp"));

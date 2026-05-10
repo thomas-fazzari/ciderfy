@@ -60,6 +60,19 @@ public class AppleMusicClientTests
         Assert.Null(AppleMusicClient.ParseTrack(element));
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("""{ "id": 123456, "attributes": {} }""")]
+    [InlineData("""{ "id": "123456", "attributes": null }""")]
+    [InlineData("""{ "id": "123456", "attributes": [] }""")]
+    public void ParseTrack_MalformedShape_ReturnsNull(string json)
+    {
+        var element = ParseElement(json);
+
+        Assert.Null(AppleMusicClient.ParseTrack(element));
+    }
+
     [Fact]
     public void ParseTrack_MissingOptionalFields_UsesDefaults()
     {
@@ -80,6 +93,26 @@ public class AppleMusicClientTests
         Assert.Equal(string.Empty, track.Artist);
         Assert.Equal(0, track.DurationMs);
         Assert.Null(track.Isrc);
+    }
+
+    [Fact]
+    public void ParseTrack_InvalidOptionalFieldTypes_ReturnsNull()
+    {
+        var element = ParseElement(
+            """
+            {
+              "id": "123456",
+              "attributes": {
+                "name": 42,
+                "artistName": [],
+                "durationInMillis": "140000",
+                "isrc": {}
+              }
+            }
+            """
+        );
+
+        Assert.Null(AppleMusicClient.ParseTrack(element));
     }
 
     [Fact]

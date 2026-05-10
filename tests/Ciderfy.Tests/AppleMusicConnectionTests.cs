@@ -26,7 +26,7 @@ public class AppleMusicConnectionTests
 
         // Assert
         Assert.NotNull(token);
-        Assert.StartsWith("eyJ", token);
+        Assert.StartsWith("eyJ", token, StringComparison.Ordinal);
         Assert.Equal(3, token.Split('.').Length); // JWT has 3 parts
     }
 

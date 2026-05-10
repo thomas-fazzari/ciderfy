@@ -71,14 +71,25 @@ internal sealed class DeezerIsrcResolver(
         if (json is null)
             return null;
 
-        var response = JsonSerializer.Deserialize<DeezerSearchResponse>(json);
-        if (response?.Data is not { Count: > 0 } data)
+        DeezerSearchResponse? response;
+        try
+        {
+            response = JsonSerializer.Deserialize<DeezerSearchResponse>(json);
+        }
+        catch (JsonException)
+        {
             return null;
+        }
 
-        var (Isrc, Score) = data.Where(item => item.Isrc is not null)
+        if (response?.Data is not { Count: > 0 } data)
+        {
+            return null;
+        }
+
+        var (isrc, score) = data.Where(item => item?.Isrc is not null)
             .Select(item =>
                 (
-                    Isrc: item.Isrc!,
+                    item!.Isrc,
                     Score: (
                         MatchingWeights.Title
                         * TrackMatcher.TitleSimilarity(title, item.Title ?? string.Empty)
@@ -89,9 +100,10 @@ internal sealed class DeezerIsrcResolver(
                         )
                 )
             )
+            .DefaultIfEmpty()
             .MaxBy(x => x.Score);
 
-        return Score >= MinIsrcMatchScore ? Isrc : null;
+        return score >= MinIsrcMatchScore ? isrc : null;
     }
 
     private async Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct)
@@ -137,5 +149,5 @@ file sealed record DeezerSearchItem(
 file sealed record DeezerArtist([property: JsonPropertyName("name")] string? Name);
 
 file sealed record DeezerSearchResponse(
-    [property: JsonPropertyName("data")] IReadOnlyList<DeezerSearchItem>? Data
+    [property: JsonPropertyName("data")] IReadOnlyList<DeezerSearchItem?>? Data
 );

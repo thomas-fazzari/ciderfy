@@ -71,6 +71,43 @@ public class DeezerIsrcResolverHttpTests
         Assert.Null(results[0].Isrc);
     }
 
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("""{ "data": null }""")]
+    [InlineData("""{ "data": {} }""")]
+    public async Task ResolveIsrcsAsync_MalformedRoot_ReturnsTrackWithNullIsrc(string json)
+    {
+        using var client = FakeHttpMessageHandler.ReturningJson(json);
+        using var resolver = Resolver(client);
+
+        var results = await resolver.ResolveIsrcsAsync([_track], ct: Ct);
+
+        Assert.Single(results);
+        Assert.Null(results[0].Isrc);
+    }
+
+    [Fact]
+    public async Task ResolveIsrcsAsync_MalformedItems_ReturnsTrackWithNullIsrc()
+    {
+        const string json = """
+            {
+              "data": [
+                null,
+                "bad",
+                { "isrc": 123, "title": "Let It Be", "artist": { "name": "The Beatles" } },
+                { "isrc": "NOMATCH001", "title": [], "artist": null }
+              ]
+            }
+            """;
+        using var client = FakeHttpMessageHandler.ReturningJson(json);
+        using var resolver = Resolver(client);
+
+        var results = await resolver.ResolveIsrcsAsync([_track], ct: Ct);
+
+        Assert.Single(results);
+        Assert.Null(results[0].Isrc);
+    }
+
     [Fact]
     public async Task ResolveIsrcsAsync_ValidResponse_PopulatesIsrc()
     {

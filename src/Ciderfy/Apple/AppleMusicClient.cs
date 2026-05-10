@@ -29,8 +29,6 @@ internal sealed class AppleMusicClient(
 {
     private const string MusicUserTokenHeader = "Music-User-Token";
 
-    private readonly HttpClient _httpClient = httpClient;
-    private readonly TokenCache _tokenCache = tokenCache;
     private readonly RateLimiter _rateLimiter = new SlidingWindowRateLimiter(
         new SlidingWindowRateLimiterOptions
         {
@@ -182,25 +180,25 @@ internal sealed class AppleMusicClient(
 
     private Dictionary<string, string> GenerateAuthHeaders(bool requireUserToken)
     {
-        if (!_tokenCache.HasValidDeveloperToken)
+        if (!tokenCache.HasValidDeveloperToken)
             throw new AppleMusicUnauthorizedException();
 
         var headers = new Dictionary<string, string>(StringComparer.Ordinal)
         {
-            [HttpHeaderNames.Authorization] = $"Bearer {_tokenCache.DeveloperToken}",
+            [HttpHeaderNames.Authorization] = $"Bearer {tokenCache.DeveloperToken}",
         };
 
         if (!requireUserToken)
             return headers;
 
-        if (!_tokenCache.HasValidUserToken)
+        if (!tokenCache.HasValidUserToken)
         {
             throw new InvalidOperationException(
                 "User token is required for this operation. Run '/auth' first."
             );
         }
 
-        headers[MusicUserTokenHeader] = _tokenCache.UserToken!;
+        headers[MusicUserTokenHeader] = tokenCache.UserToken!;
         return headers;
     }
 
@@ -214,7 +212,7 @@ internal sealed class AppleMusicClient(
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, url);
                 ApplyAuthHeaders(request, authHeaders);
-                return _httpClient.SendAsync(request, token);
+                return httpClient.SendAsync(request, token);
             },
             ct
         );
@@ -233,7 +231,7 @@ internal sealed class AppleMusicClient(
                     Content = new StringContent(jsonBody, Encoding.UTF8, MimeTypes.Json),
                 };
                 ApplyAuthHeaders(request, authHeaders);
-                return _httpClient.SendAsync(request, token);
+                return httpClient.SendAsync(request, token);
             },
             ct
         );
@@ -297,9 +295,20 @@ internal sealed class AppleMusicClient(
 
     internal static AppleMusicTrack? ParseTrack(JsonElement element)
     {
-        var e = element.Deserialize<AppleTrackElement>();
-        if (e?.Id is null || e.Attributes is null)
+        AppleTrackElement? e;
+        try
+        {
+            e = element.Deserialize<AppleTrackElement>();
+        }
+        catch (JsonException)
+        {
             return null;
+        }
+
+        if (e?.Id is null || e.Attributes is null)
+        {
+            return null;
+        }
 
         return new AppleMusicTrack
         {
@@ -313,7 +322,7 @@ internal sealed class AppleMusicClient(
 
     public void Dispose()
     {
-        _httpClient.Dispose();
+        httpClient.Dispose();
         _rateLimiter.Dispose();
     }
 }

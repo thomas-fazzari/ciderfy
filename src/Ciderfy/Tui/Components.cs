@@ -395,7 +395,7 @@ internal static class Components
         var table = new Table()
             .Border(TableBorder.Rounded)
             .BorderColor(Theme.PrimaryColor)
-            .AddColumn(new TableColumn($"[bold]Command[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Command[/]").NoWrap())
             .AddColumn(new TableColumn("[bold]Description[/]"));
 
         var start = Math.Max(

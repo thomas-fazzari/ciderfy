@@ -40,8 +40,9 @@ internal static class MatchingExtensions
                 o.Retry.ShouldHandle = new PredicateBuilder<HttpResponseMessage>()
                     .Handle<HttpRequestException>()
                     .HandleResult(r =>
-                        r.StatusCode >= HttpStatusCode.InternalServerError
-                        || r.StatusCode is HttpStatusCode.RequestTimeout
+                        r.StatusCode
+                            is >= HttpStatusCode.InternalServerError
+                                or HttpStatusCode.RequestTimeout
                     );
             });
 

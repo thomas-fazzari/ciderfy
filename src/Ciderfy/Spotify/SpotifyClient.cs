@@ -48,8 +48,6 @@ internal sealed partial class SpotifyClient(
     ];
     // csharpier-ignore-end
 
-    private readonly HttpClient _httpClient = httpClient;
-    private readonly CookieContainer _cookies = cookies;
     private readonly SpotifyClientOptions _options = options.Value;
     private readonly string _clientTokenAuthority = new Uri(options.Value.ClientTokenEndpoint).Host;
     private readonly SemaphoreSlim _authenticationLock = new(1, 1);
@@ -178,7 +176,7 @@ internal sealed partial class SpotifyClient(
 
     private async Task<SessionInfoState> GetSessionInfoAsync(CancellationToken ct)
     {
-        using var response = await _httpClient
+        using var response = await httpClient
             .GetAsync(new Uri(_options.WebBaseUrl), ct)
             .ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -187,14 +185,13 @@ internal sealed partial class SpotifyClient(
 
         string? clientVersion = null;
         var configMatch = AppServerConfigRegex().Match(html);
-        if (configMatch.Success)
-        {
-            var json = Encoding.UTF8.GetString(
-                Convert.FromBase64String(configMatch.Groups[1].Value)
-            );
-            using var doc = JsonDocument.Parse(json);
-            clientVersion = doc.RootElement.Deserialize<SessionInfoResponse>()?.ClientVersion;
-        }
+
+        if (!configMatch.Success)
+            return new SessionInfoState(clientVersion, ExtractDeviceIdFromCookies());
+
+        var json = Encoding.UTF8.GetString(Convert.FromBase64String(configMatch.Groups[1].Value));
+        using var doc = JsonDocument.Parse(json);
+        clientVersion = doc.RootElement.Deserialize<SessionInfoResponse>()?.ClientVersion;
 
         return new SessionInfoState(clientVersion, ExtractDeviceIdFromCookies());
     }
@@ -205,7 +202,7 @@ internal sealed partial class SpotifyClient(
         var url =
             $"{_options.WebBaseUrl}/api/token?reason=init&productType=web-player&totp={totpCode}&totpVer={TotpVersion}&totpServer={totpCode}";
 
-        using var response = await _httpClient.GetAsync(new Uri(url), ct).ConfigureAwait(false);
+        using var response = await httpClient.GetAsync(new Uri(url), ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -258,17 +255,29 @@ internal sealed partial class SpotifyClient(
         request.Headers.Add(HttpHeaderNames.Accept, MimeTypes.Json);
         request.Headers.Add(HttpHeaderNames.UserAgent, UserAgent);
 
-        using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+        using var response = await httpClient.SendAsync(request, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);
 
-        var clientToken = doc.RootElement.Deserialize<ClientTokenResponse>()?.GrantedToken?.Token;
-        if (string.IsNullOrWhiteSpace(clientToken))
-            throw new InvalidOperationException("Spotify client token missing from response.");
+        var clientToken = ExtractClientToken(doc.RootElement);
 
-        return clientToken;
+        return string.IsNullOrWhiteSpace(clientToken)
+            ? throw new InvalidOperationException("Spotify client token missing from response.")
+            : clientToken;
+    }
+
+    private static string? ExtractClientToken(JsonElement root)
+    {
+        try
+        {
+            return root.Deserialize<ClientTokenResponse>()?.GrantedToken?.Token;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>
@@ -300,7 +309,7 @@ internal sealed partial class SpotifyClient(
         if (!string.IsNullOrWhiteSpace(authState.ClientVersion))
             request.Headers.Add(SpotifyAppVersionHeader, authState.ClientVersion);
 
-        using var response = await _httpClient.SendAsync(request, ct).ConfigureAwait(false);
+        using var response = await httpClient.SendAsync(request, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -309,7 +318,7 @@ internal sealed partial class SpotifyClient(
 
     private string? ExtractDeviceIdFromCookies()
     {
-        var cookieCollection = _cookies.GetCookies(new Uri(_options.WebBaseUrl));
+        var cookieCollection = cookies.GetCookies(new Uri(_options.WebBaseUrl));
         return cookieCollection["sp_t"]?.Value;
     }
 
@@ -361,12 +370,7 @@ internal sealed partial class SpotifyClient(
             ? tc.GetInt32()
             : items.GetArrayLength();
 
-        foreach (var item in items.EnumerateArray())
-        {
-            var track = ParsePlaylistItem(item);
-            if (track is not null)
-                tracks.Add(track);
-        }
+        tracks.AddRange(items.EnumerateArray().Select(ParsePlaylistItem).OfType<SpotifyTrack>());
 
         return (name, tracks, totalCount);
     }
@@ -396,10 +400,14 @@ internal sealed partial class SpotifyClient(
 
     internal static string ExtractFirstArtist(JsonElement element)
     {
-        if (TryGetArtistName(element, "artists", out var name))
+        if (
+            TryGetArtistName(element, "artists", out var name)
+            || TryGetArtistName(element, "firstArtist", out name)
+        )
+        {
             return name;
-        if (TryGetArtistName(element, "firstArtist", out name))
-            return name;
+        }
+
         return string.Empty;
     }
 
@@ -416,15 +424,15 @@ internal sealed partial class SpotifyClient(
         }
 
         if (
-            items[0].TryGetProperty("profile", out var profile)
-            && profile.TryGetProperty("name", out var n)
+            !items[0].TryGetProperty("profile", out var profile)
+            || !profile.TryGetProperty("name", out var n)
         )
         {
-            name = n.GetString() ?? string.Empty;
-            return name.Length > 0;
+            return false;
         }
 
-        return false;
+        name = n.GetString() ?? string.Empty;
+        return name.Length > 0;
     }
 
     internal static string ExtractIdFromUri(JsonElement element) =>
@@ -469,7 +477,7 @@ internal sealed partial class SpotifyClient(
     public void Dispose()
     {
         _authenticationLock.Dispose();
-        _httpClient.Dispose();
+        httpClient.Dispose();
     }
 
     [GeneratedRegex(

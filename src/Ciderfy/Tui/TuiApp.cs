@@ -273,8 +273,6 @@ internal sealed partial class TuiApp(
 #pragma warning restore CA1031
     }
 
-    // Message handling lives in TuiApp.Messages.cs
-
     private void ResetTransferState() => _state.ResetTransferState();
 
     public void Dispose() => _cts.Dispose();

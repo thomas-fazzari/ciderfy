@@ -245,7 +245,7 @@ internal sealed partial class TuiApp
                 ? Math.Max(MinLogHeight, contentHeight - progressLines - QueuePanelGapHeight)
                 : contentHeight;
 
-        if (_state.ShowHelp && _state.Phase is TuiTransferPhase.Idle)
+        if (_state is { ShowHelp: true, Phase: TuiTransferPhase.Idle })
             return BuildHelpView(contentHeight);
 
         if (_state.QueuedPlaylistUrls.Count > 0 && _state.Phase is TuiTransferPhase.Idle)
@@ -341,7 +341,7 @@ internal sealed partial class TuiApp
 
     private bool ShouldShowScrollActions(int contentHeight)
     {
-        if (_state.ShowHelp && _state.Phase is TuiTransferPhase.Idle)
+        if (_state is { ShowHelp: true, Phase: TuiTransferPhase.Idle })
             return Components.HelpEntryCount > GetVisibleHelpRows(contentHeight);
 
         if (_state.Phase is not TuiTransferPhase.Done || _state.AllResults is null)

@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text;
 using Ciderfy.Spotify;
 using Ciderfy.Tests.Fakers;
 using Microsoft.Extensions.Options;
@@ -13,7 +12,7 @@ public class SpotifyClientHttpTests
     private const string ClientTokenHost = "clienttoken.spotify.com";
     private const string AccessTokenJson = """{"accessToken":"tok","clientId":"cid"}""";
     private const string ClientTokenJson = """{"granted_token":{"token":"ctok"}}""";
-    private static readonly string SessionHtml = BuildSessionHtml();
+    private static readonly string _sessionHtml = BuildSessionHtml();
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
@@ -22,9 +21,7 @@ public class SpotifyClientHttpTests
 
     private static string BuildSessionHtml()
     {
-        var base64 = Convert.ToBase64String(
-            Encoding.UTF8.GetBytes("""{"clientVersion":"1.2.3"}""")
-        );
+        var base64 = Convert.ToBase64String("""{"clientVersion":"1.2.3"}"""u8.ToArray());
         return $"""<script id="appServerConfig" type="text/plain">{base64}</script>""";
     }
 
@@ -84,12 +81,12 @@ public class SpotifyClientHttpTests
         using var http = new HttpClient(
             new FakeHttpMessageHandler(request =>
             {
-                static HttpResponseMessage Ok(string body) =>
-                    new(HttpStatusCode.OK) { Content = new StringContent(body) };
-
                 var uri = request.RequestUri!;
                 if (uri.Host == SpotifyHost && uri.AbsolutePath == "/")
-                    return Ok(SessionHtml);
+                {
+                    return Ok(_sessionHtml);
+                }
+
                 if (
                     uri.Host == SpotifyHost
                     && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
@@ -97,9 +94,10 @@ public class SpotifyClientHttpTests
                 {
                     return Ok(AccessTokenJson);
                 }
-                if (uri.Host == ClientTokenHost)
-                    return Ok(ClientTokenJson);
-                return Ok(playlistJson);
+                return uri.Host is ClientTokenHost ? Ok(ClientTokenJson) : Ok(playlistJson);
+
+                static HttpResponseMessage Ok(string body) =>
+                    new(HttpStatusCode.OK) { Content = new StringContent(body) };
             })
         );
 
@@ -113,12 +111,63 @@ public class SpotifyClientHttpTests
         Assert.Equal(durationMs, playlist.Tracks[0].DurationMs);
     }
 
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("""{ "granted_token": null }""")]
+    [InlineData("""{ "granted_token": [] }""")]
+    [InlineData("""{ "granted_token": { "token": 123 } }""")]
+    public async Task GetPlaylistAsync_MalformedClientTokenResponse_ThrowsMissingToken(
+        string clientTokenJson
+    )
+    {
+        const string playlistJson = """
+            {
+              "data": {
+                "playlistV2": {
+                  "name": "My Playlist",
+                  "content": { "items": [] }
+                }
+              }
+            }
+            """;
+
+        using var http = new HttpClient(
+            new FakeHttpMessageHandler(request =>
+            {
+                var uri = request.RequestUri!;
+                if (uri is { Host: SpotifyHost, AbsolutePath: "/" })
+                {
+                    return Ok(_sessionHtml);
+                }
+
+                if (
+                    uri.Host == SpotifyHost
+                    && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
+                )
+                {
+                    return Ok(AccessTokenJson);
+                }
+
+                return Ok(uri.Host == ClientTokenHost ? clientTokenJson : playlistJson);
+
+                static HttpResponseMessage Ok(string body) =>
+                    new(HttpStatusCode.OK) { Content = new StringContent(body) };
+            })
+        );
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Client(http).GetPlaylistAsync("playlist123", Ct)
+        );
+
+        Assert.Equal("Spotify client token missing from response.", error.Message);
+    }
+
     [Fact]
     public async Task GetPlaylistAsync_UnauthorizedMidSession_InvalidatesStateAndRetries()
     {
         const string playlistName = "Refreshed Playlist";
 
-        var playlistJson = $$"""
+        const string playlistJson = $$"""
             {
               "data": {
                 "playlistV2": {
@@ -139,25 +188,23 @@ public class SpotifyClientHttpTests
                     new(HttpStatusCode.OK) { Content = new StringContent(body) };
 
                 var uri = request.RequestUri!;
-                if (uri.Host == SpotifyHost && uri.AbsolutePath == "/")
-                    return Ok(SessionHtml);
-                if (
-                    uri.Host == SpotifyHost
-                    && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
-                )
+                switch (uri.Host)
                 {
-                    accessTokenCallCount++;
-                    return Ok(AccessTokenJson);
+                    case SpotifyHost when uri.AbsolutePath == "/":
+                        return Ok(_sessionHtml);
+                    case SpotifyHost
+                        when uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal):
+                        accessTokenCallCount++;
+                        return Ok(AccessTokenJson);
+                    case ClientTokenHost:
+                        return Ok(ClientTokenJson);
                 }
-                if (uri.Host == ClientTokenHost)
-                    return Ok(ClientTokenJson);
 
                 // First playlist call returns 401 (stale token), second succeeds
                 playlistCallCount++;
-                if (playlistCallCount == 1)
-                    return new HttpResponseMessage(HttpStatusCode.Unauthorized);
-
-                return Ok(playlistJson);
+                return playlistCallCount == 1
+                    ? new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                    : Ok(playlistJson);
             })
         );
 
@@ -173,7 +220,7 @@ public class SpotifyClientHttpTests
     {
         const string playlistName = "Recovered Playlist";
 
-        var playlistJson = $$"""
+        const string playlistJson = $$"""
             {
               "data": {
                 "playlistV2": {
@@ -185,16 +232,15 @@ public class SpotifyClientHttpTests
             """;
 
         var clientTokenAttempts = 0;
-
         using var http = new HttpClient(
             new FakeHttpMessageHandler(request =>
             {
-                static HttpResponseMessage Ok(string body) =>
-                    new(HttpStatusCode.OK) { Content = new StringContent(body) };
-
                 var uri = request.RequestUri!;
-                if (uri.Host == SpotifyHost && uri.AbsolutePath == "/")
-                    return Ok(SessionHtml);
+                if (uri is { Host: SpotifyHost, AbsolutePath: "/" })
+                {
+                    return Ok(_sessionHtml);
+                }
+
                 if (
                     uri.Host == SpotifyHost
                     && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
@@ -202,16 +248,19 @@ public class SpotifyClientHttpTests
                 {
                     return Ok(AccessTokenJson);
                 }
+
                 if (uri.Host == ClientTokenHost)
                 {
                     clientTokenAttempts++;
-                    if (clientTokenAttempts == 1)
-                        return new HttpResponseMessage(HttpStatusCode.InternalServerError);
-
-                    return Ok(ClientTokenJson);
+                    return clientTokenAttempts == 1
+                        ? new HttpResponseMessage(HttpStatusCode.InternalServerError)
+                        : Ok(ClientTokenJson);
                 }
 
                 return Ok(playlistJson);
+
+                static HttpResponseMessage Ok(string body) =>
+                    new(HttpStatusCode.OK) { Content = new StringContent(body) };
             })
         );
 

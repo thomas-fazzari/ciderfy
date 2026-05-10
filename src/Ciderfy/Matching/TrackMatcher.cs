@@ -35,11 +35,9 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         queries.Add(cleanTitle);
 
         var seen = new HashSet<string>(queries.Count, StringComparer.Ordinal);
-        foreach (var query in queries)
-        {
-            if (!seen.Add(query))
-                continue;
 
+        foreach (var query in queries.Where(seen.Add))
+        {
             var match = await TryTextMatchAsync(spotifyTrack, query, storefront, ct)
                 .ConfigureAwait(false);
             if (match is not null)
@@ -201,11 +199,14 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         foreach (var candidate in candidates)
         {
             var score = CalculateSimilarity(spotifyTrack, candidate);
-            if (score > bestScore)
+
+            if (!(score > bestScore))
             {
-                bestScore = score;
-                bestCandidate = candidate;
+                continue;
             }
+
+            bestScore = score;
+            bestCandidate = candidate;
         }
 
         return bestCandidate is not null && bestScore >= AcceptanceThreshold
@@ -251,10 +252,8 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
             return normalized[..slashIdx].Trim();
 
         var dashIdx = normalized.IndexOf(" - ", StringComparison.Ordinal);
-        if (dashIdx > 0)
-            return normalized[..dashIdx].Trim();
 
-        return normalized;
+        return dashIdx > 0 ? normalized[..dashIdx].Trim() : normalized;
     }
 
     // Matches version suffixes after a dash or slash separator, ex: "- 2024 Remaster"
@@ -264,8 +263,8 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
             + @"|single\s+version|deluxe(\s+edition)?"
             + @"|original(\s+mix)?|live(\s+(at|version)\b)?"
             + @"|bonus\s+track|remix"
-            + @"|re-recorded"
-            + @").*$",
+            + "|re-recorded"
+            + ").*$",
         RegexOptions.IgnoreCase,
         1000
     )]
@@ -282,7 +281,7 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
             + @"|single\s+version|deluxe(\s+edition)?"
             + @"|original(\s+(mix|stereo|mono))?|live(\s+(at|version)\b)?"
             + @"|bonus\s+track|remix"
-            + @"|re-recorded"
+            + "|re-recorded"
             + @"|feat\.?\s+.+|ft\.?\s+.+"
             + @")[\)\]]",
         RegexOptions.IgnoreCase,

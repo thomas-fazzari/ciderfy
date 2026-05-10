@@ -19,23 +19,20 @@ internal sealed partial class AppleMusicAuth(
 )
 {
     private readonly AppleMusicAuthOptions _options = options.Value;
-    private readonly TokenCache _tokenCache = tokenCache;
-    private readonly HttpClient _httpClient = httpClient;
 
     /// <returns>
     /// A valid developer token, using the cache if available or scraping it from the web player
     /// </returns>
     public async Task<string> GetDeveloperTokenAsync(CancellationToken ct = default)
     {
-        if (_tokenCache.HasValidDeveloperToken)
-            return _tokenCache.DeveloperToken!;
+        if (tokenCache.HasValidDeveloperToken)
+            return tokenCache.DeveloperToken!;
 
         var token = await ExtractDeveloperTokenFromWebAsync(ct).ConfigureAwait(false);
 
-        _tokenCache.DeveloperToken = token;
-        _tokenCache.DeveloperTokenExpiry =
-            GetJwtExpiry(token) ?? DateTimeOffset.UtcNow.AddHours(12);
-        _tokenCache.Save();
+        tokenCache.DeveloperToken = token;
+        tokenCache.DeveloperTokenExpiry = GetJwtExpiry(token) ?? DateTimeOffset.UtcNow.AddHours(12);
+        tokenCache.Save();
 
         return token;
     }
@@ -51,7 +48,7 @@ internal sealed partial class AppleMusicAuth(
     /// </remarks>
     private async Task<string> ExtractDeveloperTokenFromWebAsync(CancellationToken ct)
     {
-        var html = await _httpClient
+        var html = await httpClient
             .GetStringAsync(new Uri($"{_options.BaseUrl}/browse"), ct)
             .ConfigureAwait(false);
 
@@ -77,7 +74,7 @@ internal sealed partial class AppleMusicAuth(
 
             try
             {
-                var js = await _httpClient
+                var js = await httpClient
                     .GetStringAsync(new Uri(fullUrl), ct)
                     .ConfigureAwait(false);
 
