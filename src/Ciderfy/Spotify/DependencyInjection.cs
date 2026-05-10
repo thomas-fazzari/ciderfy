@@ -13,10 +13,14 @@ internal static class SpotifyExtensions
         IConfiguration configuration
     )
     {
+        services.AddSingleton<
+            IValidateOptions<SpotifyClientOptions>,
+            ValidateSpotifyClientOptions
+        >();
+
         services
             .AddOptions<SpotifyClientOptions>()
             .Bind(configuration.GetSection(SpotifyClientOptions.SectionName))
-            .ValidateDataAnnotations()
             .ValidateOnStart();
 
         services.AddSingleton<CookieContainer>();

@@ -15,17 +15,23 @@ internal static class AppleExtensions
     )
     {
         services.AddSingleton(TokenCache.Load());
+        services.AddSingleton<
+            IValidateOptions<AppleMusicClientOptions>,
+            ValidateAppleMusicClientOptions
+        >();
+        services.AddSingleton<
+            IValidateOptions<AppleMusicAuthOptions>,
+            ValidateAppleMusicAuthOptions
+        >();
 
         services
             .AddOptions<AppleMusicClientOptions>()
             .Bind(configuration.GetSection(AppleMusicClientOptions.SectionName))
-            .ValidateDataAnnotations()
             .ValidateOnStart();
 
         services
             .AddOptions<AppleMusicAuthOptions>()
             .Bind(configuration.GetSection(AppleMusicAuthOptions.SectionName))
-            .ValidateDataAnnotations()
             .ValidateOnStart();
 
         services
@@ -33,9 +39,15 @@ internal static class AppleExtensions
                 (sp, client) =>
                 {
                     var options = sp.GetRequiredService<IOptions<AppleMusicClientOptions>>().Value;
+                    var authOptions = sp.GetRequiredService<
+                        IOptions<AppleMusicAuthOptions>
+                    >().Value;
                     client.BaseAddress = new Uri(options.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                    HttpClientFactory.ConfigureAppleMusicClient(client);
+                    HttpClientFactory.ConfigureAppleMusicClient(
+                        client,
+                        new Uri(authOptions.BaseUrl).GetLeftPart(UriPartial.Authority)
+                    );
                 }
             )
             .ConfigurePrimaryHttpMessageHandler(HttpClientFactory.CreateDecompressionHandler)

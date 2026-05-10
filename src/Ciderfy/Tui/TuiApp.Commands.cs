@@ -1,3 +1,4 @@
+using Ciderfy.Configuration;
 using Ciderfy.Spotify;
 
 namespace Ciderfy.Tui;
@@ -26,6 +27,7 @@ internal sealed partial class TuiApp
         _commands.Register(HandleStorefrontCommand, "/storefront", "/sf");
         _commands.Register(HandleNameCommand, "/name");
         _commands.Register(HandleAuthCommand, "/auth");
+        _commands.Register(HandleConfigCommand, "/config", "/cfg");
         _commands.Register(HandleAddCommand, "/add");
         _commands.Register(HandleRunCommand, "/run");
     }
@@ -79,6 +81,22 @@ internal sealed partial class TuiApp
 
         _logs.Append(LogKind.Info, "Authenticating...");
         _ = Task.Run(() => RunAuthAsync(_cts.Token), _cts.Token);
+    }
+
+    private void HandleConfigCommand()
+    {
+        try
+        {
+            ConfigurationFolderOpener.Open();
+            _logs.Append(
+                LogKind.Success,
+                $"Opened config folder: {ConfigurationFolderOpener.ConfigDirectory}"
+            );
+        }
+        catch (Exception e) when (ConfigurationFolderOpener.IsOpenFailure(e))
+        {
+            _logs.Append(LogKind.Error, $"Could not open config folder: {e.Message}");
+        }
     }
 
     private void HandleAddCommand(string? argument)

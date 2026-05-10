@@ -152,13 +152,14 @@ dotnet_analyzer_diagnostic.category-roslynator.severity = warning
 # Doc comment rules
 dotnet_diagnostic.RCS1005.severity = suggestion
 dotnet_diagnostic.RCS1021.severity = suggestion
-dotnet_diagnostic.RCS1060.severity = suggestion
 dotnet_diagnostic.RCS1139.severity = none
 dotnet_diagnostic.RCS1140.severity = none
 dotnet_diagnostic.RCS1141.severity = none
 dotnet_diagnostic.RCS1181.severity = suggestion
 dotnet_diagnostic.RCS1241.severity = suggestion
 dotnet_diagnostic.RCS1242.severity = suggestion
+# Declare each type in separate file
+dotnet_diagnostic.RCS1060.severity = none
 # Add braces when expression spans multiple lines
 dotnet_diagnostic.RCS1001.severity = warning
 # Add default access modifier

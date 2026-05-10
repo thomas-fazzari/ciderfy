@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Ciderfy.Configuration;
 
 namespace Ciderfy.Apple;
 
@@ -8,14 +9,7 @@ internal sealed partial class TokenCacheJsonContext : JsonSerializerContext;
 
 internal sealed class TokenCache
 {
-    private static readonly string _cacheDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "Ciderfy"
-    );
-
-    private static string DefaultCachePath => Path.Combine(_cacheDir, "tokens.json");
-
-    private string _cachePath = DefaultCachePath;
+    private string _cachePath = AppPaths.TokenCachePath;
 
     [JsonConstructor]
     public TokenCache() { }
@@ -40,7 +34,7 @@ internal sealed class TokenCache
         && UserTokenExpiry.HasValue
         && UserTokenExpiry.Value > DateTimeOffset.UtcNow;
 
-    public static TokenCache Load() => LoadFromPath(DefaultCachePath);
+    public static TokenCache Load() => LoadFromPath(AppPaths.TokenCachePath);
 
     internal static TokenCache LoadFromPath(string cachePath)
     {

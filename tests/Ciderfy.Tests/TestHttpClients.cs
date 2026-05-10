@@ -20,7 +20,7 @@ internal static class TestHttpClients
             Timeout = TimeSpan.FromSeconds(30),
             BaseAddress = new Uri(new AppleMusicClientOptions().BaseUrl),
         };
-        HttpClientFactory.ConfigureAppleMusicClient(client);
+        HttpClientFactory.ConfigureAppleMusicClient(client, new AppleMusicAuthOptions().BaseUrl);
         return client;
     }
 

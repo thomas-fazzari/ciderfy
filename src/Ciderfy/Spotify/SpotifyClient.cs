@@ -30,14 +30,6 @@ internal sealed partial class SpotifyClient(
 {
     private const string UserAgent = HttpClientFactory.SpotifyUserAgent;
 
-    private const string PlaylistQueryHash =
-        "bb67e0af06e8d6f52b531f97468ee4acd44cd0f82b988e15c2ea47b1148efc77";
-
-    private const string SpotifyClientTokenHeader = "Client-Token";
-    private const string SpotifyAppVersionHeader = "Spotify-App-Version";
-
-    private const int TotpVersion = 61;
-
     private const int PlaylistPageSize = 1000;
 
     // csharpier-ignore-start
@@ -93,7 +85,7 @@ internal sealed partial class SpotifyClient(
                 enableWatchFeedEntrypoint = false,
             };
             using var response = await QueryGraphQlAsync(
-                    PlaylistQueryHash,
+                    _options.PlaylistQueryHash,
                     "fetchPlaylist",
                     variables,
                     ct
@@ -200,7 +192,7 @@ internal sealed partial class SpotifyClient(
     {
         var totpCode = GenerateTotpCode();
         var url =
-            $"{_options.WebBaseUrl}/api/token?reason=init&productType=web-player&totp={totpCode}&totpVer={TotpVersion}&totpServer={totpCode}";
+            $"{_options.WebBaseUrl}/api/token?reason=init&productType=web-player&totp={totpCode}&totpVer={_options.TotpVersion}&totpServer={totpCode}";
 
         using var response = await httpClient.GetAsync(new Uri(url), ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -305,9 +297,9 @@ internal sealed partial class SpotifyClient(
         using var request = new HttpRequestMessage(HttpMethod.Post, _options.GraphQlEndpoint);
         request.Content = new StringContent(serialized, Encoding.UTF8, MimeTypes.Json);
         request.Headers.Add(HttpHeaderNames.Authorization, $"Bearer {authState.AccessToken}");
-        request.Headers.Add(SpotifyClientTokenHeader, authState.ClientToken);
+        request.Headers.Add(_options.ClientTokenHeader, authState.ClientToken);
         if (!string.IsNullOrWhiteSpace(authState.ClientVersion))
-            request.Headers.Add(SpotifyAppVersionHeader, authState.ClientVersion);
+            request.Headers.Add(_options.AppVersionHeader, authState.ClientVersion);
 
         using var response = await httpClient.SendAsync(request, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();

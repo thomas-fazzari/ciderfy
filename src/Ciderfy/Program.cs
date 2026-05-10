@@ -1,11 +1,13 @@
 using Ciderfy;
+using Ciderfy.Configuration;
 using Ciderfy.Tui;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 var ct = CancellationToken.None;
-var builder = Host.CreateApplicationBuilder(args);
+var builder = Host.CreateApplicationBuilder();
+builder.Configuration.AddCiderfyConfiguration();
 builder.Logging.ClearProviders();
 builder.Services.AddCiderfy(builder.Configuration);
 

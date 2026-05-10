@@ -5,7 +5,6 @@ APP = src/Ciderfy/Ciderfy.csproj
 install:
 	dotnet restore $(SOLUTION)
 	dotnet tool restore
-	pnpm install
 
 .PHONY: build
 build:

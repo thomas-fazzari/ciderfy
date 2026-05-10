@@ -16,11 +16,11 @@ internal static class MatchingExtensions
     {
         services.AddTransient<TrackMatcher>();
         services.AddTransient<PlaylistTransferService>();
+        services.AddSingleton<IValidateOptions<DeezerClientOptions>, ValidateDeezerClientOptions>();
 
         services
             .AddOptions<DeezerClientOptions>()
             .Bind(configuration.GetSection(DeezerClientOptions.SectionName))
-            .ValidateDataAnnotations()
             .ValidateOnStart();
 
         services

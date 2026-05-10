@@ -39,6 +39,7 @@ internal static class Components
     [
         ($"[{Theme.Primary}]/auth[/]", "Authenticate with Apple Music"),
         ($"[{Theme.Primary}]/auth reset[/]", "Clear cached tokens and re-authenticate"),
+        ($"[{Theme.Primary}]/config[/]", "Open Ciderfy configuration folder"),
         ($"[{Theme.Primary}]/status[/]", "Show authentication status"),
         (
             $"[{Theme.Primary}]/storefront[/] [{Theme.Muted}]<code>[/]",

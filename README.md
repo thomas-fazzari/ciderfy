@@ -99,6 +99,25 @@ Then follow the prompt:
 
 The tool will automatically fetch and cache a valid Apple Music developer token if needed.
 
+## Configuration
+
+A config folder is generated on first launch and copies a default `ciderfy.ini` into it.
+
+Open the folder from the TUI with:
+
+```text
+/config
+```
+
+or:
+
+```text
+/cfg
+```
+
+The config file contains provider endpoints, Spotify web constants, timeouts, and rate-limit delays.
+Most users should keep the defaults, but the file can be edited if a third-party web endpoint or header changes before a new release is available.
+
 ## Usage
 
 After startup, paste a Spotify playlist URL for a direct transfer:
@@ -121,6 +140,7 @@ You can set storefront and playlist naming behavior before transfer using comman
 
 - `/auth` - authenticate with Apple Music
 - `/auth reset` - clear cached tokens and re-authenticate
+- `/config` or `/cfg` - open the user config folder
 - `/status` - show tokens and storefront status
 - `/storefront <code>` or `/sf <code>` - set Apple Music storefront (default: `us`)
 - `/add <url>` - queue a Spotify playlist for merging
