@@ -153,7 +153,7 @@ internal sealed partial class TuiApp
                 RemoveLastInputCharacter();
                 break;
             case ConsoleKey.Escape:
-                _inputBuffer.Clear();
+                HandleEscape();
                 break;
             default:
                 AppendInputCharacter(key.KeyChar);
@@ -171,6 +171,16 @@ internal sealed partial class TuiApp
     {
         if (keyChar >= 32)
             _inputBuffer.Append(keyChar);
+    }
+
+    private void HandleEscape()
+    {
+        _inputBuffer.Clear();
+        if (!_state.AwaitingUserToken)
+            return;
+
+        _state.AwaitingUserToken = false;
+        _logs.Append(LogKind.Info, "Authentication cancelled.");
     }
 
     private void HandleConfirmKey(ConsoleKeyInfo key)

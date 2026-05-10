@@ -141,13 +141,18 @@ internal sealed partial class TuiApp
     private IRenderable BuildInputRenderable(int contentWidth) =>
         _state.AwaitingUserToken
             ? Components.RenderInput(
-                _inputBuffer.ToString(),
+                MaskTokenInput(_inputBuffer.Length),
                 _state.CursorVisible,
                 contentWidth,
                 prompt: "token>",
-                placeholder: null
+                placeholder: "Paste Apple Music user token (input hidden)"
             )
             : Components.RenderInput(_inputBuffer.ToString(), _state.CursorVisible, contentWidth);
+
+    private static string MaskTokenInput(int length) =>
+        length > 0 ? $"Token hidden ({length} {PluralizeCharacter(length)})" : string.Empty;
+
+    private static string PluralizeCharacter(int count) => count == 1 ? "char" : "chars";
 
     private Rows BuildStatusSection()
     {
