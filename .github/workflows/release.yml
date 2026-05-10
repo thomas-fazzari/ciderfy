@@ -16,14 +16,14 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
-      - name: Restore
-        run: dotnet restore
+      - name: Install dependencies
+        run: make install
 
       - name: Build
-        run: dotnet build -c Release --no-restore
+        run: make build CONFIGURATION=Release
 
       - name: Test
-        run: dotnet test -c Release --no-build
+        run: make test-unit CONFIGURATION=Release
 
   publish-binaries:
     needs: test

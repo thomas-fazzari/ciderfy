@@ -26,32 +26,24 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-
 
-      - name: Restore tools
-        run: dotnet tool restore
+      - name: Install dependencies
+        run: make install
 
-      - name: Restore
-        run: dotnet restore Ciderfy.slnx
-
-      - name: Check formatting
-        run: dotnet tool run csharpier check .
-
-      - name: Build
-        run: dotnet build Ciderfy.slnx --no-restore --configuration Release
+      - name: Lint and build
+        run: make lint CONFIGURATION=Release
 
       - name: Test
-        run: |
-          dotnet test Ciderfy.slnx --no-build --configuration Release \
-            --collect:"XPlat Code Coverage" \
-            --results-directory ./coverage \
-            --settings coverage.runsettings
+        run: make test-unit-coverage CONFIGURATION=Release
 
       - name: Find coverage files
         id: coverage
         run: |
           files=$(find ./coverage -name 'coverage.cobertura.xml' | paste -sd ',')
+          test -n "$files"
           echo "files=$files" >> "$GITHUB_OUTPUT"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v6
         with:
           files: ${{ steps.coverage.outputs.files }}
+          fail_ci_if_error: true

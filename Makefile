@@ -1,5 +1,7 @@
 SOLUTION = Ciderfy.slnx
 APP = src/Ciderfy/Ciderfy.csproj
+CONFIGURATION ?= Debug
+COVERAGE_RESULTS ?= ./coverage
 
 .PHONY: install
 install:
@@ -8,7 +10,7 @@ install:
 
 .PHONY: build
 build:
-	dotnet build $(SOLUTION) --no-restore
+	dotnet build $(SOLUTION) --no-restore --configuration $(CONFIGURATION)
 
 .PHONY: run
 run:
@@ -16,11 +18,15 @@ run:
 
 .PHONY: test
 test:
-	dotnet test $(SOLUTION)
+	dotnet test $(SOLUTION) --configuration $(CONFIGURATION)
 
 .PHONY: test-unit
 test-unit:
-	dotnet test $(SOLUTION) --filter "Category!=Integration"
+	dotnet test $(SOLUTION) --configuration $(CONFIGURATION) --filter "Category!=Integration"
+
+.PHONY: test-unit-coverage
+test-unit-coverage:
+	dotnet test $(SOLUTION) --configuration $(CONFIGURATION) --filter "Category!=Integration" --collect:"XPlat Code Coverage" --results-directory $(COVERAGE_RESULTS) --settings coverage.runsettings
 
 .PHONY: format
 format:
@@ -30,7 +36,7 @@ format:
 lint:
 	dotnet tool run csharpier check .
 	dotnet tool run slopwatch analyze --fail-on warning
-	dotnet build $(SOLUTION) --no-restore
+	dotnet build $(SOLUTION) --no-restore --configuration $(CONFIGURATION)
 
 .PHONY: check
 check: lint
