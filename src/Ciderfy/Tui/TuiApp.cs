@@ -1,4 +1,4 @@
-using System.Text;
+using System.Text.Json;
 using System.Threading.Channels;
 using Ciderfy.Apple;
 using Ciderfy.Matching;
@@ -17,25 +17,59 @@ internal sealed partial class TuiApp(
 {
     private readonly Channel<TuiMessage> _channel = Channel.CreateUnbounded<TuiMessage>();
     private readonly CancellationTokenSource _cts = new();
-    private readonly LogBuffer _logs = new();
-    private readonly StringBuilder _inputBuffer = new();
-    private readonly TuiCommandRegistry _commands = new();
-    private readonly TuiState _state = new();
+    private TuiController? _controller;
+
+    private TuiController Controller =>
+        _controller ??= new TuiController(
+            tokenCache,
+            _channel.Writer,
+            () => _cts.Cancel(),
+            () => StartBackgroundTask(RunAuthAsync),
+            GetVisibleHelpRows,
+            GetVisibleDoneRows,
+            RunFetchPlaylistAsync,
+            RunIsrcMatchAsync,
+            RunTextMatchAsync,
+            RunCreatePlaylistAsync,
+            _cts.Token
+        );
 
     /// <summary>
     /// Enters the alternate screen and runs the TUI event loop until the user quits
     /// </summary>
     public Task<int> RunAsync()
     {
-        EnsureCommandsRegistered();
-        _logs.Append(LogKind.Info, "Paste a Spotify playlist URL to transfer, or type /help");
+        Controller.RegisterCommands();
+        Controller.Logs.Append(
+            LogKind.Info,
+            "Paste a Spotify playlist URL to transfer, or type /help"
+        );
 
         Console.CancelKeyPress += OnCancelKeyPress;
-        _ = RunTickTimerAsync(_cts.Token);
 
         try
         {
-            RunUiLoop();
+            AnsiConsole.Console.AlternateScreen(() =>
+            {
+                Console.CursorVisible = false;
+                try
+                {
+                    AnsiConsole
+                        .Live(new Text("Loading..."))
+                        .Overflow(VerticalOverflow.Crop)
+                        .Cropping(VerticalOverflowCropping.Bottom)
+                        .AutoClear(true)
+                        // Spectre alternate-screen callback is synchronous.
+                        // Block here to bridge its async live renderer.
+                        .StartAsync(RunRenderLoopAsync)
+                        .GetAwaiter()
+                        .GetResult();
+                }
+                finally
+                {
+                    Console.CursorVisible = true;
+                }
+            });
             return Task.FromResult(0);
         }
         finally
@@ -44,103 +78,61 @@ internal sealed partial class TuiApp(
         }
     }
 
-    private void RunUiLoop()
-    {
-        AnsiConsole.Console.AlternateScreen(() =>
-        {
-            Console.CursorVisible = false;
-            try
-            {
-                RunLiveDisplay();
-            }
-            finally
-            {
-                Console.CursorVisible = true;
-            }
-        });
-    }
-
-    private void RunLiveDisplay()
-    {
-        AnsiConsole
-            .Live(new Text("Loading..."))
-            .Overflow(VerticalOverflow.Crop)
-            .Cropping(VerticalOverflowCropping.Bottom)
-            .AutoClear(true)
-            .StartAsync(RunRenderLoopAsync)
-            .GetAwaiter()
-            .GetResult();
-    }
-
     private async Task RunRenderLoopAsync(LiveDisplayContext ctx)
     {
-        _ = Task.Run(() => ReadKeysLoop(_cts.Token), _cts.Token);
+        var inputTask = Task.Run(() => ReadKeysLoop(_cts.Token), CancellationToken.None);
+        ObserveBackgroundFault(inputTask);
 
-        while (ShouldContinueRunning())
+        while (!Controller.State.QuitRequested && !_cts.IsCancellationRequested)
         {
             DrainPendingMessages();
-            RenderFrame(ctx);
-            await WaitForNextMessageOrTimeoutAsync().ConfigureAwait(false);
+            Controller.State.SpinnerTick++;
+            Controller.State.CursorVisible = Controller.State.SpinnerTick % 8 < 5; // blinking pattern
+            ctx.UpdateTarget(BuildView());
+            ctx.Refresh();
+
+            try
+            {
+                await Task.Delay(50, _cts.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+            {
+                _channel.Writer.TryComplete();
+            }
         }
 
-        RenderFinalFrame(ctx);
+        ctx.UpdateTarget(new Text(string.Empty));
+        ctx.Refresh();
     }
-
-    private bool ShouldContinueRunning() => !_state.QuitRequested && !_cts.IsCancellationRequested;
 
     private void OnCancelKeyPress(object? sender, ConsoleCancelEventArgs e)
     {
         e.Cancel = true;
-        RequestQuit();
-    }
-
-    private void RequestQuit()
-    {
-        _state.QuitRequested = true;
-        _cts.Cancel();
+        _channel.Writer.TryWrite(new QuitRequestedMsg());
     }
 
     private void DrainPendingMessages()
     {
         while (_channel.Reader.TryRead(out var msg))
         {
-            ProcessMessage(msg);
+            Controller.ProcessMessage(msg);
         }
     }
 
-    private void RenderFrame(LiveDisplayContext ctx)
+    private void StartBackgroundTask(Func<CancellationToken, Task> operation)
     {
-        ctx.UpdateTarget(BuildView());
-        ctx.Refresh();
+        var task = Task.Run(() => operation(_cts.Token), CancellationToken.None);
+        ObserveBackgroundFault(task);
     }
 
-    private static void RenderFinalFrame(LiveDisplayContext ctx)
+    private void ObserveBackgroundFault(Task task)
     {
-        ctx.UpdateTarget(new Text(""));
-        ctx.Refresh();
-    }
-
-    private async Task WaitForNextMessageOrTimeoutAsync()
-    {
-        try
-        {
-            using var delayCts = CancellationTokenSource.CreateLinkedTokenSource(_cts.Token);
-            delayCts.CancelAfter(50);
-            await _channel.Reader.WaitToReadAsync(delayCts.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Either timeout or quit
-        }
-    }
-
-    private async Task RunTickTimerAsync(CancellationToken ct)
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(80));
-        while (await timer.WaitForNextTickAsync(ct).ConfigureAwait(false))
-        {
-            _channel.Writer.TryWrite(new TickMsg());
-        }
+        _ = task.ContinueWith(
+            t => _channel.Writer.TryWrite(new FatalErrorMsg(t.Exception!.GetBaseException())),
+            CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default
+        );
     }
 
     private async Task RunAuthAsync(CancellationToken ct)
@@ -149,21 +141,23 @@ internal sealed partial class TuiApp(
         {
             await auth.GetDeveloperTokenAsync(ct).ConfigureAwait(false);
             var needsUserToken = !tokenCache.HasValidUserToken;
-            _channel.Writer.TryWrite(new AuthDoneMsg(needsUserToken, null));
+            _channel.Writer.TryWrite(new AuthDoneMsg(needsUserToken));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
-#pragma warning disable CA1031
-        catch (Exception ex)
+        catch (Exception ex) when (IsExpectedAuthException(ex))
         {
-            _channel.Writer.TryWrite(new AuthDoneMsg(false, ex));
+            _channel.Writer.TryWrite(new AuthFailedMsg(ex));
         }
-#pragma warning restore CA1031
     }
 
-    private async Task RunFetchPlaylistAsync(List<string> playlistIds, CancellationToken ct)
+    private async Task RunFetchPlaylistAsync(
+        int transferId,
+        IReadOnlyCollection<string> playlistIds,
+        CancellationToken ct
+    )
     {
         try
         {
@@ -173,8 +167,8 @@ internal sealed partial class TuiApp(
             if (!tokenCache.HasValidUserToken)
             {
                 _channel.Writer.TryWrite(
-                    new PlaylistFetchedMsg(
-                        [],
+                    new TransferFailedMsg(
+                        transferId,
                         new InvalidOperationException("User token missing. Run /auth first.")
                     )
                 );
@@ -185,95 +179,121 @@ internal sealed partial class TuiApp(
                 transferService.FetchSpotifyPlaylistAsync(id, ct)
             );
             var playlists = await Task.WhenAll(fetchTasks).ConfigureAwait(false);
-            _channel.Writer.TryWrite(new PlaylistFetchedMsg([.. playlists], null));
+            _channel.Writer.TryWrite(new PlaylistFetchedMsg(transferId, [.. playlists]));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
-#pragma warning disable CA1031
-        catch (Exception ex)
+        catch (Exception ex) when (IsExpectedTransferException(ex))
         {
-            _channel.Writer.TryWrite(new PlaylistFetchedMsg([], ex));
+            _channel.Writer.TryWrite(new TransferFailedMsg(transferId, ex));
         }
-#pragma warning restore CA1031
     }
 
-    private async Task RunIsrcMatchAsync(CancellationToken ct)
+    private async Task RunIsrcMatchAsync(
+        int transferId,
+        List<TrackMetadata> tracks,
+        string storefront,
+        CancellationToken ct
+    )
     {
         try
         {
             var progress = new Progress<(int Current, int Total)>(p =>
-                _channel.Writer.TryWrite(new IsrcProgressMsg(p.Current, p.Total))
+                _channel.Writer.TryWrite(new IsrcProgressMsg(transferId, p.Current, p.Total))
             );
 
             var (matched, unmatched) = await transferService
-                .MatchByIsrcAsync(_state.TransferTracks!, _state.Storefront, progress, ct)
+                .MatchByIsrcAsync(tracks, storefront, progress, ct)
                 .ConfigureAwait(false);
-            _channel.Writer.TryWrite(new IsrcDoneMsg(matched, unmatched, null));
+            _channel.Writer.TryWrite(new IsrcDoneMsg(transferId, matched, unmatched));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
-#pragma warning disable CA1031
-        catch (Exception ex)
+        catch (Exception ex) when (IsExpectedTransferException(ex))
         {
-            _channel.Writer.TryWrite(new IsrcDoneMsg([], [], ex));
+            _channel.Writer.TryWrite(new TransferFailedMsg(transferId, ex));
         }
-#pragma warning restore CA1031
     }
 
-    private async Task RunTextMatchAsync(CancellationToken ct)
+    private async Task RunTextMatchAsync(
+        int transferId,
+        List<TrackMetadata> unmatchedTracks,
+        string storefront,
+        CancellationToken ct
+    )
     {
         try
         {
             var progress = new Progress<TrackMatchProgress>(p =>
                 _channel.Writer.TryWrite(
-                    new TextProgressMsg(p.Track, p.CurrentIndex, _state.UnmatchedTracks!.Count)
+                    new TextProgressMsg(transferId, p.Track, p.CurrentIndex, unmatchedTracks.Count)
                 )
             );
 
             var results = await transferService
-                .MatchByTextAsync(_state.UnmatchedTracks!, _state.Storefront, progress, ct)
+                .MatchByTextAsync(unmatchedTracks, storefront, progress, ct)
                 .ConfigureAwait(false);
-            _channel.Writer.TryWrite(new TextDoneMsg(results, null));
+            _channel.Writer.TryWrite(new TextDoneMsg(transferId, results));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
-#pragma warning disable CA1031
-        catch (Exception ex)
+        catch (Exception ex) when (IsExpectedTransferException(ex))
         {
-            _channel.Writer.TryWrite(new TextDoneMsg(null, ex));
+            _channel.Writer.TryWrite(new TransferFailedMsg(transferId, ex));
         }
-#pragma warning restore CA1031
     }
 
-    private async Task RunCreatePlaylistAsync(CancellationToken ct)
+    private async Task RunCreatePlaylistAsync(
+        int transferId,
+        string playlistName,
+        List<MatchResult> allResults,
+        CancellationToken ct
+    )
     {
         try
         {
-            var allResults = BuildAllResults();
             var result = await transferService
-                .CreatePlaylistAsync(_state.PlaylistName, allResults, ct)
+                .CreatePlaylistAsync(playlistName, allResults, ct)
                 .ConfigureAwait(false);
-            _channel.Writer.TryWrite(new PlaylistCreatedMsg(result, allResults, null));
+            _channel.Writer.TryWrite(new PlaylistCreatedMsg(transferId, result, allResults));
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             throw;
         }
-#pragma warning disable CA1031
-        catch (Exception ex)
+        catch (Exception ex) when (IsExpectedTransferException(ex))
         {
-            _channel.Writer.TryWrite(new PlaylistCreatedMsg(null, null, ex));
+            _channel.Writer.TryWrite(new TransferFailedMsg(transferId, ex));
         }
-#pragma warning restore CA1031
     }
 
-    private void ResetTransferState() => _state.ResetTransferState();
+    private static bool IsExpectedAuthException(Exception ex) =>
+        ex
+            is HttpRequestException
+                or InvalidOperationException
+                or TaskCanceledException
+                or JsonException;
 
-    public void Dispose() => _cts.Dispose();
+    private static bool IsExpectedTransferException(Exception ex) =>
+        ex
+            is AppleMusicRateLimitException
+                or AppleMusicUnauthorizedException
+                or HttpRequestException
+                or InvalidOperationException
+                or TaskCanceledException
+                or JsonException;
+
+    public void Dispose()
+    {
+        _controller?.Dispose();
+        _cts.Cancel();
+        _channel.Writer.TryComplete();
+        _cts.Dispose();
+    }
 }

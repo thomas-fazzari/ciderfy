@@ -63,6 +63,7 @@ internal sealed partial class AppleMusicAuth(
 
         string? bestCandidate = null;
         var bestCandidateExpiry = DateTimeOffset.MinValue;
+        var skippedBundleCount = 0;
 
         foreach (var scriptUrl in scriptUrls)
         {
@@ -99,7 +100,7 @@ internal sealed partial class AppleMusicAuth(
                     || (e is TaskCanceledException && !ct.IsCancellationRequested)
                 )
             {
-                // Skip failed or timed-out bundles and try next
+                skippedBundleCount++;
             }
         }
 
@@ -108,7 +109,8 @@ internal sealed partial class AppleMusicAuth(
 
         throw new InvalidOperationException(
             "Could not extract Apple Music developer token from web player. "
-                + "Apple may have changed their web player structure."
+                + "Apple may have changed their web player structure. "
+                + $"Skipped {skippedBundleCount} failed bundle(s)."
         );
     }
 
