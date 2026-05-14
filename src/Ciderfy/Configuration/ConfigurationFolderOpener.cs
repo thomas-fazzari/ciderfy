@@ -3,16 +3,39 @@ using System.Diagnostics;
 
 namespace Ciderfy.Configuration;
 
-internal static class ConfigurationFolderOpener
+internal interface IConfigurationFolderOpener
 {
-    internal static string ConfigDirectory => AppPaths.ConfigDirectory;
+    string ConfigDirectory { get; }
 
-    internal static void Open()
+    void Open();
+
+    bool IsOpenFailure(Exception exception);
+}
+
+internal sealed class ConfigurationFolderOpener : IConfigurationFolderOpener
+{
+    private readonly Func<ProcessStartInfo, Process?> _startProcess;
+
+    public ConfigurationFolderOpener()
+        : this(AppPaths.ConfigDirectory, Process.Start) { }
+
+    internal ConfigurationFolderOpener(
+        string configDirectory,
+        Func<ProcessStartInfo, Process?> startProcess
+    )
+    {
+        ConfigDirectory = configDirectory;
+        _startProcess = startProcess;
+    }
+
+    public string ConfigDirectory { get; }
+
+    public void Open()
     {
         Directory.CreateDirectory(ConfigDirectory);
 
         using var process =
-            Process.Start(CreateStartInfo(ConfigDirectory))
+            _startProcess(CreateStartInfo(ConfigDirectory))
             ?? throw new InvalidOperationException("Could not start the native file explorer.");
     }
 
@@ -38,7 +61,7 @@ internal static class ConfigurationFolderOpener
         return startInfo;
     }
 
-    internal static bool IsOpenFailure(Exception exception) =>
+    public bool IsOpenFailure(Exception exception) =>
         exception
             is IOException
                 or UnauthorizedAccessException

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Ciderfy.Configuration;
 using Microsoft.Extensions.Configuration;
 using Xunit;
@@ -96,6 +97,85 @@ public class ConfigurationTests
         Assert.Equal(expectedFileName, startInfo.FileName);
         Assert.False(startInfo.UseShellExecute);
         Assert.Equal([directory], startInfo.ArgumentList);
+    }
+
+    [Fact]
+    public void ConfigurationFolderOpener_ConfigDirectory_UsesAppPathsConfigDirectory()
+    {
+        var opener = new ConfigurationFolderOpener();
+
+        Assert.Equal(AppPaths.ConfigDirectory, opener.ConfigDirectory);
+    }
+
+    [Fact]
+    public void ConfigurationFolderOpener_Open_CreatesDirectoryAndStartsNativeExplorer()
+    {
+        var rootDir = CreateTempDirectory();
+        var configDir = Path.Combine(rootDir, "config");
+        try
+        {
+            ProcessStartInfo? startInfo = null;
+            var opener = new ConfigurationFolderOpener(
+                configDir,
+                info =>
+                {
+                    startInfo = info;
+                    return new Process();
+                }
+            );
+
+            opener.Open();
+
+            Assert.True(Directory.Exists(opener.ConfigDirectory));
+            Assert.NotNull(startInfo);
+            Assert.Equal(GetExpectedExplorerFileName(), startInfo.FileName);
+            Assert.False(startInfo.UseShellExecute);
+            Assert.Equal([opener.ConfigDirectory], startInfo.ArgumentList);
+        }
+        finally
+        {
+            Directory.Delete(rootDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConfigurationFolderOpener_Open_ThrowsWhenNativeExplorerCannotStart()
+    {
+        var rootDir = CreateTempDirectory();
+        var configDir = Path.Combine(rootDir, "config");
+        try
+        {
+            var opener = new ConfigurationFolderOpener(configDir, _ => null);
+
+            var exception = Assert.Throws<InvalidOperationException>(opener.Open);
+
+            Assert.Equal("Could not start the native file explorer.", exception.Message);
+            Assert.True(Directory.Exists(configDir));
+        }
+        finally
+        {
+            Directory.Delete(rootDir, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(typeof(IOException), true)]
+    [InlineData(typeof(UnauthorizedAccessException), true)]
+    [InlineData(typeof(InvalidOperationException), true)]
+    [InlineData(typeof(PlatformNotSupportedException), true)]
+    [InlineData(typeof(System.ComponentModel.Win32Exception), true)]
+    [InlineData(typeof(ArgumentException), false)]
+    public void ConfigurationFolderOpener_IsOpenFailure_ClassifiesExpectedExceptions(
+        Type exceptionType,
+        bool expected
+    )
+    {
+        var exception = (Exception)Activator.CreateInstance(exceptionType)!;
+        var opener = new ConfigurationFolderOpener();
+
+        var isOpenFailure = opener.IsOpenFailure(exception);
+
+        Assert.Equal(expected, isOpenFailure);
     }
 
     private static string CreateTempDirectory()

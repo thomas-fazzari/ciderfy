@@ -1,7 +1,9 @@
 using System.Text.Json;
 using System.Threading.Channels;
 using Ciderfy.Apple;
+using Ciderfy.Configuration;
 using Ciderfy.Matching;
+using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 namespace Ciderfy.Tui;
@@ -11,8 +13,8 @@ namespace Ciderfy.Tui;
 /// </summary>
 internal sealed partial class TuiApp(
     TokenCache tokenCache,
-    AppleMusicAuth auth,
-    PlaylistTransferService transferService
+    IServiceScopeFactory scopeFactory,
+    IConfigurationFolderOpener configurationFolderOpener
 ) : IDisposable
 {
     private readonly Channel<TuiMessage> _channel = Channel.CreateUnbounded<TuiMessage>();
@@ -31,6 +33,7 @@ internal sealed partial class TuiApp(
             RunIsrcMatchAsync,
             RunTextMatchAsync,
             RunCreatePlaylistAsync,
+            configurationFolderOpener,
             _cts.Token
         );
 
@@ -139,6 +142,9 @@ internal sealed partial class TuiApp(
     {
         try
         {
+            using var scope = scopeFactory.CreateScope();
+            var auth = scope.ServiceProvider.GetRequiredService<AppleMusicAuth>();
+
             await auth.GetDeveloperTokenAsync(ct).ConfigureAwait(false);
             var needsUserToken = !tokenCache.HasValidUserToken;
             _channel.Writer.TryWrite(new AuthDoneMsg(needsUserToken));
@@ -161,6 +167,11 @@ internal sealed partial class TuiApp(
     {
         try
         {
+            using var scope = scopeFactory.CreateScope();
+            var auth = scope.ServiceProvider.GetRequiredService<AppleMusicAuth>();
+            var transferService =
+                scope.ServiceProvider.GetRequiredService<PlaylistTransferService>();
+
             if (!tokenCache.HasValidDeveloperToken)
                 await auth.GetDeveloperTokenAsync(ct).ConfigureAwait(false);
 
@@ -200,6 +211,10 @@ internal sealed partial class TuiApp(
     {
         try
         {
+            using var scope = scopeFactory.CreateScope();
+            var transferService =
+                scope.ServiceProvider.GetRequiredService<PlaylistTransferService>();
+
             var progress = new Progress<(int Current, int Total)>(p =>
                 _channel.Writer.TryWrite(new IsrcProgressMsg(transferId, p.Current, p.Total))
             );
@@ -228,6 +243,10 @@ internal sealed partial class TuiApp(
     {
         try
         {
+            using var scope = scopeFactory.CreateScope();
+            var transferService =
+                scope.ServiceProvider.GetRequiredService<PlaylistTransferService>();
+
             var progress = new Progress<TrackMatchProgress>(p =>
                 _channel.Writer.TryWrite(
                     new TextProgressMsg(transferId, p.Track, p.CurrentIndex, unmatchedTracks.Count)
@@ -258,6 +277,10 @@ internal sealed partial class TuiApp(
     {
         try
         {
+            using var scope = scopeFactory.CreateScope();
+            var transferService =
+                scope.ServiceProvider.GetRequiredService<PlaylistTransferService>();
+
             var result = await transferService
                 .CreatePlaylistAsync(playlistName, allResults, ct)
                 .ConfigureAwait(false);

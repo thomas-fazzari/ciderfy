@@ -16,7 +16,7 @@ internal sealed partial class AppleMusicAuth(
     TokenCache tokenCache,
     HttpClient httpClient,
     IOptions<AppleMusicAuthOptions> options
-)
+) : IDisposable
 {
     private readonly AppleMusicAuthOptions _options = options.Value;
 
@@ -187,4 +187,9 @@ internal sealed partial class AppleMusicAuth(
         1000
     )]
     private static partial Regex JwtTokenRegex();
+
+    public void Dispose()
+    {
+        httpClient.Dispose();
+    }
 }

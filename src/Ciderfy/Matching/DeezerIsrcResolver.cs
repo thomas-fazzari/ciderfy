@@ -133,6 +133,7 @@ internal sealed class DeezerIsrcResolver(
 
     public void Dispose()
     {
+        httpClient.Dispose();
         _rateLimiter.Dispose();
     }
 }

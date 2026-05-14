@@ -18,6 +18,7 @@ internal sealed class TuiController(
     Func<int, List<TrackMetadata>, string, CancellationToken, Task> matchByIsrc,
     Func<int, List<TrackMetadata>, string, CancellationToken, Task> matchByText,
     Func<int, string, List<MatchResult>, CancellationToken, Task> createPlaylist,
+    IConfigurationFolderOpener configurationFolderOpener,
     CancellationToken appToken
 ) : IDisposable
 {
@@ -529,13 +530,13 @@ internal sealed class TuiController(
     {
         try
         {
-            ConfigurationFolderOpener.Open();
+            configurationFolderOpener.Open();
             Logs.Append(
                 LogKind.Success,
-                $"Opened config folder: {ConfigurationFolderOpener.ConfigDirectory}"
+                $"Opened config folder: {configurationFolderOpener.ConfigDirectory}"
             );
         }
-        catch (Exception e) when (ConfigurationFolderOpener.IsOpenFailure(e))
+        catch (Exception e) when (configurationFolderOpener.IsOpenFailure(e))
         {
             Logs.Append(LogKind.Error, $"Could not open config folder: {e.Message}");
         }
