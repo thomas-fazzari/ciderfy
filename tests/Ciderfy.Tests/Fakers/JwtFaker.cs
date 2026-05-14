@@ -5,11 +5,13 @@ namespace Ciderfy.Tests.Fakers;
 
 internal static class JwtFaker
 {
+    private const string FakeSignature = "abcdefghijklmnopqrstuvwxyz1234567890";
+
     public static string Make(object header, object payload)
     {
         var headerJson = JsonSerializer.Serialize(header);
         var payloadJson = JsonSerializer.Serialize(payload);
-        return $"{B64Url(headerJson)}.{B64Url(payloadJson)}.fakesig";
+        return $"{B64Url(headerJson)}.{B64Url(payloadJson)}.{FakeSignature}";
     }
 
     public static long FutureExp => DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
