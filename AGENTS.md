@@ -1,28 +1,59 @@
 # AGENTS.md
 
-## Prime Directive
+## Operating Loop
 
-- Inspect existing code before deciding.
-- Make the smallest correct change.
-- Ask one focused question when requirements, API behavior, or architecture direction are unclear.
-- Touch only files needed for the task. Do not silently fix unrelated issues.
-- Validate with exact commands, then report results.
-- Never log or expose tokens, cookies, JWTs, user config, or obfuscated secret material.
+1. Inspect existing code before choosing a pattern.
+2. Keep the smallest correct change.
+3. Preserve current architecture boundaries.
+4. Do not introduce layers, projects, services, mediators, repositories, CQRS, or compatibility shims unless the user asks, persisted/shipped behavior requires it, or at least two existing call sites duplicate the same 20+ lines or same 3+ operation workflow.
+5. Run the narrowest useful validation first, then broader gates when done.
+6. Report exact validation commands and results.
+
+Do not guess. If requirements, API behavior, or architecture direction are ambiguous, ask one focused question before editing.
+
+Never log or expose tokens, cookies, JWTs, user config, or obfuscated secret material.
+
+## Skill Routing
+
+- `$caveman` is active by default for every response. Disable it only when the user explicitly says `normal mode` or `stop caveman`.
+- Use `$grill-me` before any non-trivial feature, refactor, or architecture work unless the user explicitly says to skip grill-me.
+- Use `$ciderfy-guidelines` when changing `src/Ciderfy`, `tests/Ciderfy.Tests`, config defaults, provider behavior, matching behavior, TUI commands, or HTTP client setup.
+- Use Context7 for current external library/framework/API docs before changing code that depends on .NET, Spectre.Console, xUnit, Polly/resilience, rate limiting, or other packages, SDKs, CLI tools, or framework APIs.
+
+## Subagents
+
+Subagents are authorized for non-trivial tasks when independent work can run in parallel.
+
+Usecases:
+
+- independent codebase questions
+- large reviews split by area
+- implementation split across disjoint files/modules
+- verification that can run while local work continues
+
+Rules:
+
+- Do not delegate the immediate blocker on the critical path.
+- Give each subagent one concrete scope and expected output.
+- For code edits, assign disjoint file ownership and tell subagents not to revert others' changes.
+- Continue local non-overlapping work while subagents run.
+- Wait only when their result blocks the next step.
+- Close subagents when done.
 
 ## Project Shape
 
-| Path | Owns |
-| --- | --- |
-| `src/Ciderfy` | host setup, composition root |
-| `src/Ciderfy/Apple` | Apple Music auth, API client, token cache |
-| `src/Ciderfy/Spotify` | Spotify web-player auth, GraphQL playlist client, URL parsing |
-| `src/Ciderfy/Matching` | transfer workflow, Deezer ISRC lookup, fuzzy matching, playlist merge |
-| `src/Ciderfy/Tui` | Spectre.Console UI, commands, state, rendering, messages |
-| `src/Ciderfy/Web` | shared HTTP constants and typed-client helpers |
-| `src/Ciderfy/Configuration` | app paths, INI bootstrap, validation attributes |
-| `tests/Ciderfy.Tests` | xUnit v3 tests and fakes |
+| Path                        | Role                                                                  |
+| --------------------------- | --------------------------------------------------------------------- |
+| `src/Ciderfy`               | host setup and composition root                                       |
+| `src/Ciderfy/Apple`         | Apple Music auth, API client, developer token extraction, token cache |
+| `src/Ciderfy/Spotify`       | Spotify web-player auth, GraphQL playlist client, URL parsing         |
+| `src/Ciderfy/Matching`      | transfer workflow, Deezer ISRC lookup, fuzzy matching, playlist merge |
+| `src/Ciderfy/Tui`           | Spectre.Console UI, commands, state, rendering, messages              |
+| `src/Ciderfy/Web`           | shared HTTP constants and typed-client helpers                        |
+| `src/Ciderfy/Configuration` | app paths, INI bootstrap, validation attributes                       |
+| `tests/Ciderfy.Tests`       | xUnit v3 tests and fakes                                              |
 
-## Boundaries
+Rules:
 
 - Keep one assembly unless concrete need says otherwise.
 - `Program.cs` stays thin: build host, add config, register `AddCiderfy(...)`, run `TuiApp`, stop host.
@@ -30,94 +61,62 @@
 - TUI coordinates user flow only. Business workflow stays in `Matching`.
 - Provider HTTP/parsing details stay in `Apple`, `Spotify`, or Deezer resolver code.
 - `Web` stays shared HTTP headers, MIME constants, and handler/client configuration only.
-- Do not add generic service layers, repositories, mediators, CQRS, or new projects without explicit need.
 
-## Transfer Invariants
-
-Flow: Spotify URL -> Spotify playlist fetch -> merge/dedupe -> Deezer ISRC -> Apple ISRC lookup -> optional text fallback -> Apple playlist create.
-
-- Preserve first-seen track order; dedupe merged playlists by `SpotifyId`.
-- Keep ISRC matching first. Text matching is fallback because false positives are possible.
-- Shared scoring constants belong in `MatchingConstants`.
-- Matching changes need focused tests for normalization, thresholds, and duration penalties.
-- Unit tests must not hit live networks. Use `FakeHttpMessageHandler`.
-
-## Provider Invariants
-
-- Ciderfy must not require Spotify, Apple, or Deezer developer accounts.
-- Spotify uses web-player behavior: persisted GraphQL query hash, encapsulated TOTP, cookie container, unauthorized retry once.
-- Apple developer token extraction stays automatic from Apple Music web assets.
-- User token enters via `/auth`; TUI input stays masked.
-- `TokenCache` owns token persistence under `AppPaths.TokenCachePath`; persistence tests use temp paths.
-- Apple 401/429 stay typed exceptions so TUI can show useful failures.
-
-## HTTP, Options, Config
-
-- Production HTTP clients come from typed-client DI only. Do not manually instantiate production `HttpClient`.
-- Use `AddStandardResilienceHandler` unless endpoint behavior requires narrower handling.
-- Apple and Deezer rate limits use `SlidingWindowRateLimiter`; no arbitrary sleeps.
-- Always pass and honor `CancellationToken`; preserve cancellation before broad catches.
-- Options classes need `SectionName`, data annotations, `[OptionsValidator]`, DI `IValidateOptions<T>`, and `.ValidateOnStart()`.
-- Keep option defaults synchronized with `ciderfy.ini`.
-- User config is copied from `ciderfy.ini` on first launch only; never overwrite normal user config.
-
-## TUI
-
-- `TuiApp` partial files split core loop, input, commands, rendering, messages.
-- `TuiState` owns mutable UI state. `Components` and `Theme` are render-focused and side-effect free.
-- Background operations post `TuiMessage`; state transitions happen on UI loop.
-- Register commands in `EnsureCommandsRegistered()` through `TuiCommandRegistry`.
-- User-visible command changes must update `/help` and README command docs.
-- No blocking work in render path.
-
-## Code Style
-
-- Target .NET 10, nullable enabled, latest C#, analyzers enabled, warnings as errors.
-- Prefer `internal sealed`; use `static` for stateless helpers.
-- Use file-scoped namespaces and `ConfigureAwait(false)` in async code.
-- Use `System.Text.Json`; keep private API DTOs as `file sealed record` near parser/client.
-- Use `[GeneratedRegex(..., 1000)]` for regexes.
-- Keep constants near owning feature unless shared.
-- No broad warning suppressions. If suppression is needed, keep it narrow and explain why.
-- No backwards compatibility code unless persisted data, shipped behavior, external consumers, or explicit user need requires it.
-
-## Tests And Gates
+## Commands
 
 Use `make` as source of truth.
 
-| Command | Purpose |
-| --- | --- |
-| `make install` | restore solution and local tools |
-| `make build` | build with analyzers |
-| `make test-unit` | tests excluding `Category=Integration` |
-| `make test` | all tests |
-| `make lint` | CSharpier check, Slopwatch, build |
-| `make format` | CSharpier format |
+```bash
+make install
+make format
+make build
+make test-unit
+make test
+make lint
+```
 
-Validation order:
+Rules:
+
+- `make format` may rewrite files.
+- `make lint` is the commit-worthy gate: CSharpier check, Slopwatch, build.
+- Unit tests must not hit live networks. Use `FakeHttpMessageHandler`.
+
+## Validation
+
+Default order:
 
 1. Targeted tests for changed behavior.
 2. `make test-unit` for normal code changes.
 3. `make test` when behavior spans providers, matching, or config.
-4. `make lint` before commit-worthy state.
+4. `make build` after project, dependency, analyzer, or source-generator changes.
+5. `make lint` for final commit-worthy state.
 
-Test rules:
+Never claim done without validation evidence. If validation cannot run, say why.
 
-- xUnit v3. Use `TestContext.Current.CancellationToken`; not `CancellationToken.None`.
-- Reusable fakes live in `tests/Ciderfy.Tests/Fakers`.
-- Real-network tests require `[IntegrationTest]`.
-- Avoid sleeps/delays; add deterministic seams.
+## Change Discipline
 
-## External Docs
+- Touch only files needed for the task.
+- Preserve existing style and naming.
+- Remove code made obsolete by the change.
+- Do not silently fix unrelated issues.
+- Do not add backward compatibility unless persisted data, shipped behavior, external consumers, or explicit user need requires it.
+- For bug fixes, add or update a failing test first when feasible.
+- For refactors, keep behavior unchanged and prove it with tests.
+- Do not bypass formatters, analyzers, Slopwatch, warning-as-error gates, or strict test rules.
+- Do not add warning suppressions, disabled tests, arbitrary delays, or project-level `NoWarn` unless explicitly justified.
 
-- Use Context7 before changing code that depends on .NET, Spectre.Console, xUnit, or other library APIs.
-- For undocumented Spotify/Apple web behavior, protect changes with parser/client tests and clear brittle-structure comments.
-
-## Hard No
+## Hard Prohibitions
 
 - No token/cookie/JWT/Music-User-Token/client-token logging.
 - No production `HttpClient` outside DI typed-client registration.
-- No unvalidated meaningful options.
+- No live-network unit tests.
 - No arbitrary sleeps for rate limits, retries, or tests.
+- No unvalidated meaningful options.
 - No disabled tests or broad suppressions to make gates pass.
 - No unrelated rewrites or architecture layers.
+
+## Git
+
+- Do not stage, unstage, commit, reset, restore, checkout, branch, push, or otherwise mutate git state unless the user explicitly asks for that exact git action.
+- Do not use git as a review workflow substitute. Prefer reading files and running validation.
+- If the user asks for git output, run only the requested read-only command and report the important lines.
