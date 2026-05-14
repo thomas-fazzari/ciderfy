@@ -31,7 +31,7 @@ internal static class SpotifyExtensions
                 {
                     var options = sp.GetRequiredService<IOptions<SpotifyClientOptions>>().Value;
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                    HttpClientFactory.ConfigureSpotifyClient(client);
+                    HttpClientDefaults.ConfigureSpotifyClient(client);
                 }
             )
             .ConfigurePrimaryHttpMessageHandler(sp => new HttpClientHandler

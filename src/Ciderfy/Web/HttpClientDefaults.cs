@@ -5,7 +5,7 @@ namespace Ciderfy.Web;
 /// <summary>
 /// Shared HTTP client configuration used by both the DI extensions and integration test helpers
 /// </summary>
-internal static class HttpClientFactory
+internal static class HttpClientDefaults
 {
     internal const string AppleMusicAuthUserAgent =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "

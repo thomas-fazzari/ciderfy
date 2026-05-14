@@ -28,7 +28,7 @@ internal sealed partial class SpotifyClient(
     IOptions<SpotifyClientOptions> options
 ) : IDisposable
 {
-    private const string UserAgent = HttpClientFactory.SpotifyUserAgent;
+    private const string UserAgent = HttpClientDefaults.SpotifyUserAgent;
 
     private const int PlaylistPageSize = 1000;
 

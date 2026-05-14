@@ -30,10 +30,10 @@ internal static class MatchingExtensions
                     var options = sp.GetRequiredService<IOptions<DeezerClientOptions>>().Value;
                     client.BaseAddress = new Uri(options.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                    HttpClientFactory.ConfigureDeezerClient(client);
+                    HttpClientDefaults.ConfigureDeezerClient(client);
                 }
             )
-            .ConfigurePrimaryHttpMessageHandler(HttpClientFactory.CreateDecompressionHandler)
+            .ConfigurePrimaryHttpMessageHandler(HttpClientDefaults.CreateDecompressionHandler)
             .AddStandardResilienceHandler(o =>
             {
                 // 429 handled by internal SlidingWindowRateLimiter

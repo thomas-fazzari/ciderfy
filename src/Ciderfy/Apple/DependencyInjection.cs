@@ -44,13 +44,13 @@ internal static class AppleExtensions
                     >().Value;
                     client.BaseAddress = new Uri(options.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                    HttpClientFactory.ConfigureAppleMusicClient(
+                    HttpClientDefaults.ConfigureAppleMusicClient(
                         client,
                         new Uri(authOptions.BaseUrl).GetLeftPart(UriPartial.Authority)
                     );
                 }
             )
-            .ConfigurePrimaryHttpMessageHandler(HttpClientFactory.CreateDecompressionHandler)
+            .ConfigurePrimaryHttpMessageHandler(HttpClientDefaults.CreateDecompressionHandler)
             .AddStandardResilienceHandler(o =>
             {
                 // 429 handled manually via AppleMusicRateLimitException
@@ -68,7 +68,7 @@ internal static class AppleExtensions
                 {
                     var options = sp.GetRequiredService<IOptions<AppleMusicAuthOptions>>().Value;
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
-                    HttpClientFactory.ConfigureAppleMusicAuthClient(client);
+                    HttpClientDefaults.ConfigureAppleMusicAuthClient(client);
                 }
             )
             .AddStandardResilienceHandler();
