@@ -1,0 +1,12 @@
+{
+	"file_scan_exclusions": [
+		".vscode",
+		"node_modules",
+		"**/bin",
+		"**/obj",
+		"**/TestResults",
+		"**/artifacts",
+		"**/coverage",
+		"**/*.dmp"
+	]
+}
