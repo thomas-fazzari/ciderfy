@@ -84,13 +84,6 @@ internal sealed class TokenCache
         Save();
     }
 
-    public void ClearDeveloperToken()
-    {
-        DeveloperToken = null;
-        DeveloperTokenExpiry = null;
-        Save();
-    }
-
     private static bool TryDeleteTempFile(string tempPath)
     {
         try

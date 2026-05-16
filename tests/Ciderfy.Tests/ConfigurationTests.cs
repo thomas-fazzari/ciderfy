@@ -26,7 +26,10 @@ public class ConfigurationTests
                 new Dictionary<string, string?> { ["Spotify:TotpVersion"] = "99" }
             );
 
-            configuration.AddCiderfyConfiguration(tempDir);
+            configuration.AddCiderfyConfiguration(
+                tempDir,
+                Path.Combine(AppContext.BaseDirectory, "ciderfy.ini")
+            );
 
             Assert.Equal(
                 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

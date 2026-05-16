@@ -119,34 +119,6 @@ public class TokenCacheTests
     }
 
     [Fact]
-    public void ClearDeveloperToken_ClearsDeveloperToken_PreservesUserToken()
-    {
-        var tempDir = CreateTempDirectory();
-        try
-        {
-            var expiry = DateTimeOffset.UtcNow.AddHours(1);
-            var cache = new TokenCache(Path.Combine(tempDir, "tokens.json"))
-            {
-                DeveloperToken = "dev",
-                DeveloperTokenExpiry = expiry,
-                UserToken = "user",
-                UserTokenExpiry = expiry,
-            };
-
-            cache.ClearDeveloperToken();
-
-            Assert.Null(cache.DeveloperToken);
-            Assert.Null(cache.DeveloperTokenExpiry);
-            Assert.Equal("user", cache.UserToken);
-            Assert.Equal(expiry, cache.UserTokenExpiry);
-        }
-        finally
-        {
-            Directory.Delete(tempDir, recursive: true);
-        }
-    }
-
-    [Fact]
     public void LoadFromPath_CorruptedJson_ReturnsEmptyCache()
     {
         var tempDir = CreateTempDirectory();

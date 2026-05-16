@@ -11,9 +11,6 @@ internal static class ConfigurationManagerExtensions
         internal ConfigurationManager AddCiderfyConfiguration() =>
             configuration.AddCiderfyConfiguration(AppPaths.ConfigDirectory, GetTemplatePath());
 
-        internal ConfigurationManager AddCiderfyConfiguration(string configDirectory) =>
-            configuration.AddCiderfyConfiguration(configDirectory, GetTemplatePath());
-
         internal ConfigurationManager AddCiderfyConfiguration(
             string configDirectory,
             string templatePath
