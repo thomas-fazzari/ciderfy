@@ -204,7 +204,7 @@ internal sealed class TuiController(
     {
         if (key.Key is ConsoleKey.Enter)
         {
-            if (State.TransferTracks is null)
+            if (State.TransferTracks.Count == 0)
                 return true;
 
             var transferId = TransferSession.Id;
@@ -366,7 +366,7 @@ internal sealed class TuiController(
         switch (char.ToLowerInvariant(key.KeyChar))
         {
             case 'y' or '\r' or '\n':
-                if (State.UnmatchedTracks is null)
+                if (State.UnmatchedTracks.Count == 0)
                     return true;
 
                 var transferId = TransferSession.Id;
@@ -385,9 +385,8 @@ internal sealed class TuiController(
                 break;
             case 'n':
                 Logs.Append(LogKind.Info, "Text matching skipped.");
-                if (State.UnmatchedTracks is not null)
+                if (State.UnmatchedTracks.Count > 0)
                 {
-                    State.TextResults ??= [];
                     foreach (var t in State.UnmatchedTracks)
                         State.TextResults.Add(new MatchResult.NotFound(t, "Skipped"));
                 }
@@ -650,7 +649,7 @@ internal sealed class TuiController(
 
         Logs.Append(
             LogKind.Success,
-            $"{msg.Matched.Count}/{State.TransferTracks?.Count ?? 0} matched via ISRC"
+            $"{msg.Matched.Count}/{State.TransferTracks.Count} matched via ISRC"
         );
         if (msg.Unmatched.Count > 0)
             Logs.Append(LogKind.Info, $"{msg.Unmatched.Count} remaining");
@@ -675,7 +674,7 @@ internal sealed class TuiController(
         var textMatched = msg.Results.Count(r => r is MatchResult.Matched);
         Logs.Append(
             LogKind.Success,
-            $"{textMatched}/{State.UnmatchedTracks?.Count ?? 0} matched via text"
+            $"{textMatched}/{State.UnmatchedTracks.Count} matched via text"
         );
         Logs.Append(LogKind.Separator, string.Empty);
 
@@ -795,14 +794,14 @@ internal sealed class TuiController(
     private List<MatchResult> BuildAllResults()
     {
         var allResults = new List<MatchResult>();
-        var isrcMap = (State.IsrcResults ?? [])
-            .DistinctBy(m => m.SpotifyTrack.SpotifyId)
+        var isrcMap = State
+            .IsrcResults.DistinctBy(m => m.SpotifyTrack.SpotifyId)
             .ToDictionary(m => m.SpotifyTrack.SpotifyId);
-        var textMap = (State.TextResults ?? [])
-            .DistinctBy(m => m.SpotifyTrack.SpotifyId)
+        var textMap = State
+            .TextResults.DistinctBy(m => m.SpotifyTrack.SpotifyId)
             .ToDictionary(m => m.SpotifyTrack.SpotifyId);
 
-        foreach (var track in State.TransferTracks ?? [])
+        foreach (var track in State.TransferTracks)
         {
             if (isrcMap.TryGetValue(track.SpotifyId, out var isrcMatch))
                 allResults.Add(isrcMatch);

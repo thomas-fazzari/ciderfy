@@ -292,7 +292,7 @@ internal sealed partial class TuiApp
                 progressLines = PlaylistConfirmationHeight;
                 progressSection = TransferProgressSection.RenderPlaylistConfirmation(
                     state.PlaylistName,
-                    state.TransferTracks?.Count ?? 0,
+                    state.TransferTracks.Count,
                     state.Storefront
                 );
                 break;
@@ -324,7 +324,7 @@ internal sealed partial class TuiApp
             case TuiTransferPhase.ConfirmTextMatch:
                 progressLines = SpinnerSectionHeight;
                 progressSection = TransferProgressSection.RenderConfirmPrompt(
-                    state.UnmatchedTracks?.Count ?? 0
+                    state.UnmatchedTracks.Count
                 );
                 break;
             case TuiTransferPhase.TextMatching:
@@ -419,7 +419,7 @@ internal sealed partial class TuiApp
     {
         var state = Controller.State;
 
-        if (state.AllResults is null || state.TransferTracks is null)
+        if (state.TransferTracks.Count == 0)
             return new Text("No results");
 
         var matched = state.AllResults.OfType<MatchResult.Matched>().Count();
@@ -458,7 +458,7 @@ internal sealed partial class TuiApp
         if (state is { ShowHelp: true, Phase: TuiTransferPhase.Idle })
             return HelpSection.EntryCount > GetVisibleHelpRows(contentHeight);
 
-        if (state.Phase is not TuiTransferPhase.Done || state.AllResults is null)
+        if (state.Phase is not TuiTransferPhase.Done)
         {
             return false;
         }

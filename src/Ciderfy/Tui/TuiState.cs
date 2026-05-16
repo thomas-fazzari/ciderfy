@@ -15,12 +15,12 @@ internal sealed class TuiState
     internal int ProgressCurrent { get; set; }
     internal int ProgressTotal { get; set; }
     internal string ProgressLabel { get; set; } = string.Empty;
-    internal List<TrackMetadata>? TransferTracks { get; set; }
-    internal List<MatchResult.Matched>? IsrcResults { get; set; }
-    internal List<TrackMetadata>? UnmatchedTracks { get; set; }
-    internal List<MatchResult>? TextResults { get; set; }
+    internal List<TrackMetadata> TransferTracks { get; set; } = [];
+    internal List<MatchResult.Matched> IsrcResults { get; set; } = [];
+    internal List<TrackMetadata> UnmatchedTracks { get; set; } = [];
+    internal List<MatchResult> TextResults { get; set; } = [];
     internal string PlaylistName { get; set; } = string.Empty;
-    internal List<MatchResult>? AllResults { get; set; }
+    internal List<MatchResult> AllResults { get; set; } = [];
     internal int ScrollOffset { get; set; }
     internal bool CursorVisible { get; set; } = true;
 
@@ -30,11 +30,11 @@ internal sealed class TuiState
         ProgressCurrent = 0;
         ProgressTotal = 0;
         ProgressLabel = string.Empty;
-        TransferTracks = null;
-        IsrcResults = null;
-        UnmatchedTracks = null;
-        TextResults = null;
-        AllResults = null;
+        TransferTracks.Clear();
+        IsrcResults.Clear();
+        UnmatchedTracks.Clear();
+        TextResults.Clear();
+        AllResults.Clear();
         PlaylistName = string.Empty;
         ScrollOffset = 0;
     }
