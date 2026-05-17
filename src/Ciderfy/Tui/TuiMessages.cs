@@ -27,6 +27,10 @@ internal sealed record FatalErrorMsg(Exception Error) : TuiMessage;
 
 internal sealed record AuthFailedMsg(Exception Error) : TuiMessage;
 
+internal sealed record ConfigOpenedMsg(string Directory) : TuiMessage;
+
+internal sealed record ConfigOpenFailedMsg(string Message) : TuiMessage;
+
 internal sealed record TransferFailedMsg(int TransferId, Exception Error)
     : TransferMessage(TransferId);
 

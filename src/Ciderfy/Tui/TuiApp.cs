@@ -1,8 +1,6 @@
-using System.Text.Json;
 using System.Threading.Channels;
 using Ciderfy.Apple;
 using Ciderfy.Configuration;
-using Ciderfy.Matching;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
@@ -19,30 +17,26 @@ internal sealed partial class TuiApp(
 {
     private readonly Channel<TuiMessage> _channel = Channel.CreateUnbounded<TuiMessage>();
     private readonly CancellationTokenSource _cts = new();
-    private TuiController? _controller;
+    private TuiEffectRunner? _effectRunner;
 
-    private TuiController Controller =>
-        _controller ??= new TuiController(
+    private TuiEffectRunner EffectRunner =>
+        _effectRunner ??= new TuiEffectRunner(
             tokenCache,
+            scopeFactory,
+            configurationFolderOpener,
             _channel.Writer,
             () => _cts.Cancel(),
-            () => StartBackgroundTask(RunAuthAsync),
-            GetVisibleHelpRows,
-            GetVisibleDoneRows,
-            RunFetchPlaylistAsync,
-            RunIsrcMatchAsync,
-            RunTextMatchAsync,
-            RunCreatePlaylistAsync,
-            configurationFolderOpener,
             _cts.Token
         );
+
+    private TuiController Controller =>
+        field ??= new TuiController(tokenCache, GetVisibleHelpRows, GetVisibleDoneRows);
 
     /// <summary>
     /// Enters the alternate screen and runs the TUI event loop until the user quits
     /// </summary>
     public Task<int> RunAsync()
     {
-        Controller.RegisterCommands();
         Controller.Logs.Append(
             LogKind.Info,
             "Paste a Spotify playlist URL to transfer, or type /help"
@@ -118,14 +112,8 @@ internal sealed partial class TuiApp(
     {
         while (_channel.Reader.TryRead(out var msg))
         {
-            Controller.ProcessMessage(msg);
+            EffectRunner.ExecuteAll(Controller.ProcessMessage(msg));
         }
-    }
-
-    private void StartBackgroundTask(Func<CancellationToken, Task> operation)
-    {
-        var task = Task.Run(() => operation(_cts.Token), CancellationToken.None);
-        ObserveBackgroundFault(task);
     }
 
     private void ObserveBackgroundFault(Task task)
@@ -138,183 +126,9 @@ internal sealed partial class TuiApp(
         );
     }
 
-    private async Task RunAuthAsync(CancellationToken ct)
-    {
-        try
-        {
-            using var scope = scopeFactory.CreateScope();
-            var auth = scope.ServiceProvider.GetRequiredService<AppleMusicAuth>();
-
-            await auth.GetDeveloperTokenAsync(ct).ConfigureAwait(false);
-            var needsUserToken = !tokenCache.HasValidUserToken;
-            _channel.Writer.TryWrite(new AuthDoneMsg(needsUserToken));
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsExpectedAuthException(ex))
-        {
-            _channel.Writer.TryWrite(new AuthFailedMsg(ex));
-        }
-    }
-
-    private async Task RunFetchPlaylistAsync(
-        int transferId,
-        IReadOnlyCollection<string> playlistIds,
-        CancellationToken ct
-    )
-    {
-        try
-        {
-            using var scope = scopeFactory.CreateScope();
-            var auth = scope.ServiceProvider.GetRequiredService<AppleMusicAuth>();
-            var transferService =
-                scope.ServiceProvider.GetRequiredService<PlaylistTransferService>();
-
-            if (!tokenCache.HasValidDeveloperToken)
-                await auth.GetDeveloperTokenAsync(ct).ConfigureAwait(false);
-
-            if (!tokenCache.HasValidUserToken)
-            {
-                _channel.Writer.TryWrite(
-                    new TransferFailedMsg(
-                        transferId,
-                        new InvalidOperationException("User token missing. Run /auth first.")
-                    )
-                );
-                return;
-            }
-
-            var fetchTasks = playlistIds.Select(id =>
-                transferService.FetchSpotifyPlaylistAsync(id, ct)
-            );
-            var playlists = await Task.WhenAll(fetchTasks).ConfigureAwait(false);
-            _channel.Writer.TryWrite(new PlaylistFetchedMsg(transferId, [.. playlists]));
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsExpectedTransferException(ex))
-        {
-            _channel.Writer.TryWrite(new TransferFailedMsg(transferId, ex));
-        }
-    }
-
-    private async Task RunIsrcMatchAsync(
-        int transferId,
-        List<TrackMetadata> tracks,
-        string storefront,
-        CancellationToken ct
-    )
-    {
-        try
-        {
-            using var scope = scopeFactory.CreateScope();
-            var transferService =
-                scope.ServiceProvider.GetRequiredService<PlaylistTransferService>();
-
-            var progress = new Progress<(int Current, int Total)>(p =>
-                _channel.Writer.TryWrite(new IsrcProgressMsg(transferId, p.Current, p.Total))
-            );
-
-            var (matched, unmatched) = await transferService
-                .MatchByIsrcAsync(tracks, storefront, progress, ct)
-                .ConfigureAwait(false);
-            _channel.Writer.TryWrite(new IsrcDoneMsg(transferId, matched, unmatched));
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsExpectedTransferException(ex))
-        {
-            _channel.Writer.TryWrite(new TransferFailedMsg(transferId, ex));
-        }
-    }
-
-    private async Task RunTextMatchAsync(
-        int transferId,
-        List<TrackMetadata> unmatchedTracks,
-        string storefront,
-        CancellationToken ct
-    )
-    {
-        try
-        {
-            using var scope = scopeFactory.CreateScope();
-            var transferService =
-                scope.ServiceProvider.GetRequiredService<PlaylistTransferService>();
-
-            var progress = new Progress<TrackMatchProgress>(p =>
-                _channel.Writer.TryWrite(
-                    new TextProgressMsg(transferId, p.Track, p.CurrentIndex, unmatchedTracks.Count)
-                )
-            );
-
-            var results = await transferService
-                .MatchByTextAsync(unmatchedTracks, storefront, progress, ct)
-                .ConfigureAwait(false);
-            _channel.Writer.TryWrite(new TextDoneMsg(transferId, results));
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsExpectedTransferException(ex))
-        {
-            _channel.Writer.TryWrite(new TransferFailedMsg(transferId, ex));
-        }
-    }
-
-    private async Task RunCreatePlaylistAsync(
-        int transferId,
-        string playlistName,
-        List<MatchResult> allResults,
-        CancellationToken ct
-    )
-    {
-        try
-        {
-            using var scope = scopeFactory.CreateScope();
-            var transferService =
-                scope.ServiceProvider.GetRequiredService<PlaylistTransferService>();
-
-            var result = await transferService
-                .CreatePlaylistAsync(playlistName, allResults, ct)
-                .ConfigureAwait(false);
-            _channel.Writer.TryWrite(new PlaylistCreatedMsg(transferId, result, allResults));
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex) when (IsExpectedTransferException(ex))
-        {
-            _channel.Writer.TryWrite(new TransferFailedMsg(transferId, ex));
-        }
-    }
-
-    private static bool IsExpectedAuthException(Exception ex) =>
-        ex
-            is HttpRequestException
-                or InvalidOperationException
-                or TaskCanceledException
-                or JsonException;
-
-    private static bool IsExpectedTransferException(Exception ex) =>
-        ex
-            is AppleMusicRateLimitException
-                or AppleMusicUnauthorizedException
-                or HttpRequestException
-                or InvalidOperationException
-                or TaskCanceledException
-                or JsonException;
-
     public void Dispose()
     {
-        _controller?.Dispose();
+        _effectRunner?.Dispose();
         _cts.Cancel();
         _channel.Writer.TryComplete();
         _cts.Dispose();

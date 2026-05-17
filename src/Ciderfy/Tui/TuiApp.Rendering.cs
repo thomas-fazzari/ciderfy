@@ -44,8 +44,12 @@ internal sealed partial class TuiApp
         }
     }
 
-    // Lines consumed within the Done view by non-table elements.
-    // Summary panel (3) + Gap(1) + Table header and borders (3) + Gap (1) + Hint (1)
+    /// <summary>
+    /// Lines consumed within the Done view by non-table elements
+    /// </summary>
+    /// <remarks>
+    /// Summary panel (3) + Gap(1) + Table header and borders (3) + Gap (1) + Hint (1)
+    /// </remarks>
     private const int DoneViewChromeHeight = 3 + 1 + 3 + 1 + 1;
 
     // Layout regions

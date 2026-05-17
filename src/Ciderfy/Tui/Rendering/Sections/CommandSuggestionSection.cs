@@ -30,7 +30,7 @@ internal static class CommandSuggestionSection
 
         return new Panel(new Rows(rows))
         {
-            Header = new PanelHeader("Commands - arrows select, Tab accepts"),
+            Header = new PanelHeader("Commands - arrows select, Enter/Tab accepts"),
             Border = BoxBorder.Rounded,
             BorderStyle = new Style(Theme.PrimaryColor),
             Padding = new Padding(1, 0),

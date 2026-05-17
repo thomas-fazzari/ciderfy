@@ -1,9 +1,9 @@
-using Ciderfy.Apple;
 using Ciderfy.Matching;
+using Ciderfy.Tests.Fakers;
 using Ciderfy.Tui;
 using Xunit;
 
-namespace Ciderfy.Tests;
+namespace Ciderfy.Tests.Tui;
 
 public sealed class TuiStateTests
 {
@@ -22,13 +22,7 @@ public sealed class TuiStateTests
     [Fact]
     public void ResetTransferState_Clears_Collections_And_Resets_Phase()
     {
-        var track = new TrackMetadata
-        {
-            SpotifyId = "abc",
-            Title = "Song",
-            Artist = "Artist",
-            DurationMs = 180_000,
-        };
+        var track = TrackMetadataFaker.Default.Generate();
         var state = new TuiState
         {
             Phase = TuiTransferPhase.Done,
@@ -36,21 +30,15 @@ public sealed class TuiStateTests
             IsrcResults =
             [
                 new MatchResult.Matched(
-                    track,
-                    new AppleMusicTrack
-                    {
-                        Id = "x",
-                        Title = "Song",
-                        Artist = "Artist",
-                        DurationMs = 180_000,
-                    },
-                    MatchMethod.Isrc,
-                    1.0
+                    SpotifyTrack: track,
+                    AppleTrack: AppleTrackFaker.Default.Generate(),
+                    Method: MatchMethod.Isrc,
+                    Confidence: 1.0
                 ),
             ],
             UnmatchedTracks = [track],
-            TextResults = [new MatchResult.NotFound(track, "Skipped")],
-            AllResults = [new MatchResult.NotFound(track, "Skipped")],
+            TextResults = [new MatchResult.NotFound(SpotifyTrack: track, Reason: "Skipped")],
+            AllResults = [new MatchResult.NotFound(SpotifyTrack: track, Reason: "Skipped")],
             PlaylistName = "My Playlist",
             ProgressCurrent = 5,
             ProgressTotal = 10,
@@ -84,7 +72,7 @@ public sealed class TuiStateTests
             AwaitingUserToken = true,
             NextPlaylistName = "override",
         };
-        state.QueuedPlaylistUrls.Add("spotify:playlist:abc");
+        state.QueuedPlaylistUrls.Add(item: "spotify:playlist:abc");
 
         state.ResetTransferState();
 

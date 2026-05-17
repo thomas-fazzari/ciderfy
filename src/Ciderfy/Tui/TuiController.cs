@@ -1,7 +1,5 @@
 using System.Text;
-using System.Threading.Channels;
 using Ciderfy.Apple;
-using Ciderfy.Configuration;
 using Ciderfy.Matching;
 using Ciderfy.Spotify;
 
@@ -9,28 +7,16 @@ namespace Ciderfy.Tui;
 
 internal sealed class TuiController(
     TokenCache tokenCache,
-    ChannelWriter<TuiMessage> messages,
-    Action cancelApp,
-    Action startAuth,
     Func<int> getVisibleHelpRows,
-    Func<int> getVisibleDoneRows,
-    Func<int, IReadOnlyCollection<string>, CancellationToken, Task> fetchPlaylists,
-    Func<int, List<TrackMetadata>, string, CancellationToken, Task> matchByIsrc,
-    Func<int, List<TrackMetadata>, string, CancellationToken, Task> matchByText,
-    Func<int, string, List<MatchResult>, CancellationToken, Task> createPlaylist,
-    IConfigurationFolderOpener configurationFolderOpener,
-    CancellationToken appToken
-) : IDisposable
+    Func<int> getVisibleDoneRows
+)
 {
-    private readonly Dictionary<string, Action<string?>> _commands = new(
-        StringComparer.OrdinalIgnoreCase
-    );
     private string? _selectedCommandSuggestionCompletion;
+    private int _transferId;
 
     internal LogBuffer Logs { get; } = new();
     internal StringBuilder InputBuffer { get; } = new();
     internal TuiState State { get; } = new();
-    internal TuiTransferSession TransferSession { get; } = new();
 
     internal IReadOnlyList<TuiCommandSuggestion> CommandSuggestions =>
         TuiCommands.GetSuggestions(InputBuffer.ToString(), State.AwaitingUserToken);
@@ -38,48 +24,38 @@ internal sealed class TuiController(
     internal int SelectedCommandSuggestionIndex =>
         GetSelectedCommandSuggestionIndex(CommandSuggestions);
 
-    internal void RegisterCommands()
+    internal IReadOnlyList<ITuiEffect> ProcessMessage(TuiMessage msg)
     {
-        Register(_ => RequestQuit(), TuiCommands.Quit, TuiCommands.Exit, TuiCommands.QuitShort);
-        Register(_ => ToggleHelp(), TuiCommands.Help, TuiCommands.HelpShort);
-        Register(_ => Logs.Append(LogKind.Info, StatusSummary()), TuiCommands.Status);
-        Register(HandleStorefrontCommand, TuiCommands.Storefront, TuiCommands.StorefrontShort);
-        Register(HandleNameCommand, TuiCommands.Name);
-        Register(HandleAuthCommand, TuiCommands.Auth);
-        Register(_ => HandleConfigCommand(), TuiCommands.Config, TuiCommands.ConfigShort);
-        Register(HandleAddCommand, TuiCommands.Add);
-        Register(_ => HandleRunCommand(), TuiCommands.Run);
-    }
+        var effects = new List<ITuiEffect>();
 
-    internal void ProcessMessage(TuiMessage msg)
-    {
-        if (
-            msg is TransferMessage { TransferId: var transferId }
-            && TransferSession.IsStale(transferId)
-        )
-        {
-            return;
-        }
+        if (msg is TransferMessage { TransferId: var transferId } && transferId != _transferId)
+            return effects;
 
         switch (msg)
         {
             case KeyPressedMsg m:
-                HandleKey(m.Key);
+                HandleKey(m.Key, effects);
                 break;
             case QuitRequestedMsg:
-                RequestQuit();
+                RequestQuit(effects);
                 break;
             case FatalErrorMsg m:
-                HandleFatalError(m.Error);
+                HandleFatalError(m.Error, effects);
                 break;
             case AuthFailedMsg m:
                 HandleAuthFailed(m.Error);
                 break;
             case TransferFailedMsg m:
-                HandleTransferFailed(m.Error);
+                HandleTransferFailed(m.Error, effects);
                 break;
             case AuthDoneMsg m:
                 HandleAuthDone(m);
+                break;
+            case ConfigOpenedMsg m:
+                Logs.Append(LogKind.Success, $"Opened config folder: {m.Directory}");
+                break;
+            case ConfigOpenFailedMsg m:
+                Logs.Append(LogKind.Error, $"Could not open config folder: {m.Message}");
                 break;
             case PlaylistFetchedMsg m:
                 HandlePlaylistFetched(m);
@@ -89,7 +65,7 @@ internal sealed class TuiController(
                 State.ProgressTotal = m.Total;
                 break;
             case IsrcDoneMsg m:
-                HandleIsrcDone(m);
+                HandleIsrcDone(m, effects);
                 break;
             case TextProgressMsg m:
                 State.ProgressCurrent = m.Current;
@@ -100,12 +76,14 @@ internal sealed class TuiController(
                 );
                 break;
             case TextDoneMsg m:
-                HandleTextDone(m);
+                HandleTextDone(m, effects);
                 break;
             case PlaylistCreatedMsg m:
                 HandlePlaylistCreated(m);
                 break;
         }
+
+        return effects;
     }
 
     internal string StatusSummary()
@@ -115,40 +93,34 @@ internal sealed class TuiController(
         return $"Developer token: {dev}  |  User token: {user}  |  Storefront: {State.Storefront}";
     }
 
-    private void Register(Action<string?> handler, params string[] aliases)
+    private void HandleKey(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
-        foreach (var alias in aliases)
-            _commands[alias] = handler;
-    }
-
-    private void HandleKey(ConsoleKeyInfo key)
-    {
-        if (HandleQuitShortcut(key))
+        if (HandleQuitShortcut(key, effects))
             return;
 
-        if (TryHandlePhaseInput(key) || State.Phase is not TuiTransferPhase.Idle)
+        if (TryHandlePhaseInput(key, effects) || State.Phase is not TuiTransferPhase.Idle)
             return;
 
-        HandleGeneralInput(key);
+        HandleGeneralInput(key, effects);
     }
 
-    private bool TryHandlePhaseInput(ConsoleKeyInfo key)
+    private bool TryHandlePhaseInput(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
-        if (TryHandleTransferCancelInput(key))
+        if (TryHandleTransferCancelInput(key, effects))
             return true;
 
         return State is { ShowHelp: true, Phase: TuiTransferPhase.Idle }
             ? TryHandleHelpInput(key)
             : State.Phase switch
             {
-                TuiTransferPhase.ConfirmPlaylist => TryHandlePlaylistConfirmInput(key),
-                TuiTransferPhase.ConfirmTextMatch => HandleConfirmKey(key),
+                TuiTransferPhase.ConfirmPlaylist => TryHandlePlaylistConfirmInput(key, effects),
+                TuiTransferPhase.ConfirmTextMatch => HandleConfirmKey(key, effects),
                 TuiTransferPhase.Done => TryHandleDonePhaseInput(key),
                 _ => false,
             };
     }
 
-    private bool TryHandleTransferCancelInput(ConsoleKeyInfo key)
+    private bool TryHandleTransferCancelInput(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         if (key.Key is not ConsoleKey.Escape)
             return false;
@@ -168,7 +140,7 @@ internal sealed class TuiController(
             return false;
         }
 
-        CancelTransfer();
+        CancelTransfer(effects);
         return true;
     }
 
@@ -191,23 +163,22 @@ internal sealed class TuiController(
         }
     }
 
-    private bool HandleQuitShortcut(ConsoleKeyInfo key)
+    private bool HandleQuitShortcut(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         if (key is not { Key: ConsoleKey.C, Modifiers: ConsoleModifiers.Control })
             return false;
 
-        RequestQuit();
+        RequestQuit(effects);
         return true;
     }
 
-    private bool TryHandlePlaylistConfirmInput(ConsoleKeyInfo key)
+    private bool TryHandlePlaylistConfirmInput(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         if (key.Key is ConsoleKey.Enter)
         {
             if (State.TransferTracks.Count == 0)
                 return true;
 
-            var transferId = TransferSession.Id;
             var tracks = State.TransferTracks.ToList();
             var storefront = State.Storefront;
 
@@ -215,11 +186,11 @@ internal sealed class TuiController(
             State.ProgressCurrent = 0;
             State.ProgressTotal = tracks.Count;
             Logs.Append(LogKind.Info, "Starting ISRC matching...");
-            StartTransferStep(transferId, (id, ct) => matchByIsrc(id, tracks, storefront, ct));
+            effects.Add(new StartIsrcMatchEffect(_transferId, tracks, storefront));
         }
         else if (key.Key is ConsoleKey.Escape or ConsoleKey.Backspace)
         {
-            CancelTransfer();
+            CancelTransfer(effects);
         }
 
         return true;
@@ -233,11 +204,10 @@ internal sealed class TuiController(
                 State.ScrollOffset = Math.Max(0, State.ScrollOffset - 1);
                 return true;
             case ConsoleKey.DownArrow:
-                if (State.AllResults is not null)
-                    ScrollOffsetDown(State.AllResults.Count, getVisibleDoneRows());
+                ScrollOffsetDown(State.AllResults.Count, getVisibleDoneRows());
                 return true;
             case ConsoleKey.Enter:
-                ResetTransferState();
+                State.ResetTransferState();
                 return true;
             default:
                 return false;
@@ -252,12 +222,15 @@ internal sealed class TuiController(
         );
     }
 
-    private void HandleGeneralInput(ConsoleKeyInfo key)
+    private void HandleGeneralInput(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         switch (key.Key)
         {
             case ConsoleKey.Enter:
-                HandleEnter();
+                if (TryCompleteCommandSuggestion())
+                    break;
+
+                HandleEnter(effects);
                 break;
             case ConsoleKey.Tab:
                 CompleteCommandSuggestion();
@@ -309,13 +282,24 @@ internal sealed class TuiController(
             return;
         }
 
-        if (
-            GetSelectedCommandSuggestionIndex(suggestions) == 0
-            && !IsSelectedCommandSuggestion(suggestions[0])
-        )
-        {
-            _selectedCommandSuggestionCompletion = suggestions[0].Completion;
-        }
+        _selectedCommandSuggestionCompletion = suggestions[
+            GetSelectedCommandSuggestionIndex(suggestions)
+        ].Completion;
+    }
+
+    private bool TryCompleteCommandSuggestion()
+    {
+        var suggestions = CommandSuggestions;
+        if (suggestions.Count == 0)
+            return false;
+
+        var input = InputBuffer.ToString();
+        if (suggestions.Any(s => s.Completion.Equals(input, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        var selectedSuggestion = suggestions[GetSelectedCommandSuggestionIndex(suggestions)];
+        CompleteCommandSuggestion(selectedSuggestion);
+        return true;
     }
 
     private void CompleteCommandSuggestion()
@@ -324,14 +308,15 @@ internal sealed class TuiController(
         if (suggestions.Count == 0)
             return;
 
-        var selectedSuggestion = suggestions[GetSelectedCommandSuggestionIndex(suggestions)];
-        InputBuffer.Clear().Append(CompleteWithTrailingSpace(selectedSuggestion.Completion));
+        CompleteCommandSuggestion(suggestions[GetSelectedCommandSuggestionIndex(suggestions)]);
+    }
+
+    private void CompleteCommandSuggestion(TuiCommandSuggestion selectedSuggestion)
+    {
+        InputBuffer.Clear().Append(selectedSuggestion.Completion);
         _selectedCommandSuggestionCompletion = selectedSuggestion.Completion;
         ClampCommandSuggestionSelection();
     }
-
-    private static string CompleteWithTrailingSpace(string completion) =>
-        completion.EndsWith(' ') ? completion : completion + ' ';
 
     private int GetSelectedCommandSuggestionIndex(IReadOnlyList<TuiCommandSuggestion> suggestions)
     {
@@ -340,15 +325,24 @@ internal sealed class TuiController(
 
         for (var i = 0; i < suggestions.Count; i++)
         {
-            if (IsSelectedCommandSuggestion(suggestions[i]))
+            if (suggestions[i].Completion == _selectedCommandSuggestionCompletion)
+                return i;
+        }
+
+        return GetDefaultCommandSuggestionIndex(suggestions);
+    }
+
+    private int GetDefaultCommandSuggestionIndex(IReadOnlyList<TuiCommandSuggestion> suggestions)
+    {
+        var input = InputBuffer.ToString();
+        for (var i = 0; i < suggestions.Count; i++)
+        {
+            if (suggestions[i].Completion.Equals(input, StringComparison.OrdinalIgnoreCase))
                 return i;
         }
 
         return 0;
     }
-
-    private bool IsSelectedCommandSuggestion(TuiCommandSuggestion suggestion) =>
-        suggestion.Completion == _selectedCommandSuggestionCompletion;
 
     private void HandleEscape()
     {
@@ -361,7 +355,7 @@ internal sealed class TuiController(
         Logs.Append(LogKind.Info, "Authentication cancelled.");
     }
 
-    private bool HandleConfirmKey(ConsoleKeyInfo key)
+    private bool HandleConfirmKey(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         switch (char.ToLowerInvariant(key.KeyChar))
         {
@@ -369,7 +363,6 @@ internal sealed class TuiController(
                 if (State.UnmatchedTracks.Count == 0)
                     return true;
 
-                var transferId = TransferSession.Id;
                 var unmatchedTracks = State.UnmatchedTracks.ToList();
                 var storefront = State.Storefront;
 
@@ -378,10 +371,7 @@ internal sealed class TuiController(
                 State.ProgressTotal = unmatchedTracks.Count;
                 State.ProgressLabel = string.Empty;
                 Logs.Append(LogKind.Info, "Starting text matching...");
-                StartTransferStep(
-                    transferId,
-                    (id, ct) => matchByText(id, unmatchedTracks, storefront, ct)
-                );
+                effects.Add(new StartTextMatchEffect(_transferId, unmatchedTracks, storefront));
                 break;
             case 'n':
                 Logs.Append(LogKind.Info, "Text matching skipped.");
@@ -392,14 +382,14 @@ internal sealed class TuiController(
                 }
 
                 State.Phase = TuiTransferPhase.CreatingPlaylist;
-                StartCreatePlaylist(TransferSession.Id);
+                StartCreatePlaylist(_transferId, effects);
                 break;
         }
 
         return true;
     }
 
-    private void HandleEnter()
+    private void HandleEnter(List<ITuiEffect> effects)
     {
         State.ShowHelp = false;
 
@@ -420,7 +410,7 @@ internal sealed class TuiController(
 
         if (raw.StartsWith('/'))
         {
-            HandleCommand(raw);
+            HandleCommand(raw, effects);
             return;
         }
 
@@ -436,7 +426,7 @@ internal sealed class TuiController(
                 return;
             }
 
-            StartPlaylistFetch([urlInfo.Id], "Starting transfer...");
+            StartPlaylistFetch([urlInfo.Id], "Starting transfer...", effects);
             return;
         }
 
@@ -461,21 +451,46 @@ internal sealed class TuiController(
         Logs.Append(LogKind.Info, StatusSummary());
     }
 
-    private void HandleCommand(string raw)
+    private void HandleCommand(string raw, List<ITuiEffect> effects)
     {
-        var parts = raw.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        var cmd = parts[0];
-        var arg = parts.Length > 1 ? parts[1].Trim() : null;
+        var command = TuiCommands.Parse(raw);
 
-        if (_commands.TryGetValue(cmd, out var handler))
+        switch (command.Kind)
         {
-            handler(arg);
-            return;
+            case TuiCommandKind.Quit:
+                RequestQuit(effects);
+                break;
+            case TuiCommandKind.Help:
+                ToggleHelp();
+                break;
+            case TuiCommandKind.Status:
+                Logs.Append(LogKind.Info, StatusSummary());
+                break;
+            case TuiCommandKind.Storefront:
+                HandleStorefrontCommand(command.Argument);
+                break;
+            case TuiCommandKind.Name:
+                HandleNameCommand(command.Argument);
+                break;
+            case TuiCommandKind.Auth:
+                HandleAuthCommand(resetTokens: false, effects: effects);
+                break;
+            case TuiCommandKind.AuthReset:
+                HandleAuthCommand(resetTokens: true, effects: effects);
+                break;
+            case TuiCommandKind.Config:
+                effects.Add(new OpenConfigEffect());
+                break;
+            case TuiCommandKind.Add:
+                HandleAddCommand(command.Argument);
+                break;
+            case TuiCommandKind.Run:
+                HandleRunCommand(effects);
+                break;
+            default:
+                Logs.Append(LogKind.Error, $"Unknown command: {command.Name}. Type /help");
+                break;
         }
-
-#pragma warning disable CA1308
-        Logs.Append(LogKind.Error, $"Unknown command: {cmd.ToLowerInvariant()}. Type /help");
-#pragma warning restore CA1308
     }
 
     private void ToggleHelp()
@@ -511,34 +526,18 @@ internal sealed class TuiController(
         Logs.Append(LogKind.Success, $"Next playlist name set to \"{State.NextPlaylistName}\"");
     }
 
-    private void HandleAuthCommand(string? argument)
+    private void HandleAuthCommand(bool resetTokens, List<ITuiEffect> effects)
     {
         Logs.Clear();
 
-        if ("reset".Equals(argument, StringComparison.OrdinalIgnoreCase))
+        if (resetTokens)
         {
             tokenCache.Clear();
             Logs.Append(LogKind.Warning, "Tokens cleared.");
         }
 
         Logs.Append(LogKind.Info, "Authenticating...");
-        startAuth();
-    }
-
-    private void HandleConfigCommand()
-    {
-        try
-        {
-            configurationFolderOpener.Open();
-            Logs.Append(
-                LogKind.Success,
-                $"Opened config folder: {configurationFolderOpener.ConfigDirectory}"
-            );
-        }
-        catch (Exception e) when (configurationFolderOpener.IsOpenFailure(e))
-        {
-            Logs.Append(LogKind.Error, $"Could not open config folder: {e.Message}");
-        }
+        effects.Add(new StartAuthEffect());
     }
 
     private void HandleAddCommand(string? argument)
@@ -583,7 +582,7 @@ internal sealed class TuiController(
         }
     }
 
-    private void HandleRunCommand()
+    private void HandleRunCommand(List<ITuiEffect> effects)
     {
         if (State.QueuedPlaylistUrls.Count == 0)
         {
@@ -596,7 +595,8 @@ internal sealed class TuiController(
 
         StartPlaylistFetch(
             playlistIdsToFetch,
-            $"Starting transfer of {playlistIdsToFetch.Count} merged playlists..."
+            $"Starting transfer of {playlistIdsToFetch.Count} merged playlists...",
+            effects
         );
     }
 
@@ -642,7 +642,7 @@ internal sealed class TuiController(
         State.Phase = TuiTransferPhase.ConfirmPlaylist;
     }
 
-    private void HandleIsrcDone(IsrcDoneMsg msg)
+    private void HandleIsrcDone(IsrcDoneMsg msg, List<ITuiEffect> effects)
     {
         State.IsrcResults = msg.Matched;
         State.UnmatchedTracks = msg.Unmatched;
@@ -663,11 +663,11 @@ internal sealed class TuiController(
         else
         {
             State.Phase = TuiTransferPhase.CreatingPlaylist;
-            StartCreatePlaylist(msg.TransferId);
+            StartCreatePlaylist(msg.TransferId, effects);
         }
     }
 
-    private void HandleTextDone(TextDoneMsg msg)
+    private void HandleTextDone(TextDoneMsg msg, List<ITuiEffect> effects)
     {
         State.TextResults = msg.Results;
 
@@ -679,7 +679,7 @@ internal sealed class TuiController(
         Logs.Append(LogKind.Separator, string.Empty);
 
         State.Phase = TuiTransferPhase.CreatingPlaylist;
-        StartCreatePlaylist(msg.TransferId);
+        StartCreatePlaylist(msg.TransferId, effects);
     }
 
     private void HandlePlaylistCreated(PlaylistCreatedMsg msg)
@@ -711,9 +711,10 @@ internal sealed class TuiController(
         HandleTransferError(err);
     }
 
-    private void HandleTransferFailed(Exception err)
+    private void HandleTransferFailed(Exception err, List<ITuiEffect> effects)
     {
-        TransferSession.CancelAndInvalidate();
+        _transferId++;
+        effects.Add(new CancelCurrentTransferEffect());
         State.Phase = TuiTransferPhase.Idle;
         State.AwaitingUserToken = false;
         HandleTransferError(err);
@@ -749,47 +750,49 @@ internal sealed class TuiController(
         }
     }
 
-    private void HandleFatalError(Exception err)
+    private void HandleFatalError(Exception err, List<ITuiEffect> effects)
     {
-        TransferSession.CancelCurrent();
+        _transferId++;
+        effects.Add(new CancelCurrentTransferEffect());
         State.Phase = TuiTransferPhase.Idle;
         State.AwaitingUserToken = false;
         Logs.Append(LogKind.Error, $"Fatal background error: {err.Message}");
     }
 
-    private void RequestQuit()
+    private void RequestQuit(List<ITuiEffect> effects)
     {
         State.QuitRequested = true;
-        TransferSession.CancelCurrent();
-        cancelApp();
+        effects.Add(new QuitAppEffect());
     }
 
-    private void CancelTransfer()
+    private void CancelTransfer(List<ITuiEffect> effects)
     {
-        TransferSession.CancelAndInvalidate();
-        ResetTransferState();
+        _transferId++;
+        effects.Add(new CancelCurrentTransferEffect());
+        State.ResetTransferState();
         Logs.Append(LogKind.Info, "Transfer cancelled.");
     }
 
-    private void StartPlaylistFetch(IReadOnlyCollection<string> playlistIds, string startMessage)
+    private void StartPlaylistFetch(
+        IReadOnlyCollection<string> playlistIds,
+        string startMessage,
+        List<ITuiEffect> effects
+    )
     {
-        var transferId = TransferSession.Begin();
-        ResetTransferState();
+        var transferId = ++_transferId;
+        State.ResetTransferState();
         State.Phase = TuiTransferPhase.FetchingPlaylist;
         Logs.Clear();
         Logs.Append(LogKind.Info, startMessage);
-        StartTransferStep(transferId, (id, ct) => fetchPlaylists(id, playlistIds, ct));
+        effects.Add(new StartFetchPlaylistsEffect(transferId, playlistIds.ToArray()));
     }
 
-    private void StartCreatePlaylist(int transferId)
+    private void StartCreatePlaylist(int transferId, List<ITuiEffect> effects)
     {
         var allResults = BuildAllResults();
         var playlistName = State.PlaylistName;
-        StartTransferStep(transferId, (id, ct) => createPlaylist(id, playlistName, allResults, ct));
+        effects.Add(new StartCreatePlaylistEffect(transferId, playlistName, allResults));
     }
-
-    private void StartTransferStep(int transferId, Func<int, CancellationToken, Task> operation) =>
-        TransferSession.Start(transferId, operation, messages, appToken);
 
     private List<MatchResult> BuildAllResults()
     {
@@ -813,8 +816,4 @@ internal sealed class TuiController(
 
         return allResults;
     }
-
-    private void ResetTransferState() => State.ResetTransferState();
-
-    public void Dispose() => TransferSession.Dispose();
 }

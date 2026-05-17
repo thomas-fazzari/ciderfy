@@ -140,7 +140,7 @@ You can set storefront and playlist naming behavior before transfer using comman
 ## Commands
 
 - `/auth` - authenticate with Apple Music
-- `/auth reset` - clear cached tokens and re-authenticate
+- `/reset-auth` - clear cached tokens and re-authenticate
 - `/config` or `/cfg` - open the user config folder
 - `/status` - show tokens and storefront status
 - `/storefront <code>` or `/sf <code>` - set Apple Music storefront (default: `us`)
