@@ -1,5 +1,0 @@
-interface:
-  display_name: "Ciderfy Guidelines"
-  short_description: "Repo-specific rules for Ciderfy code, tests, providers, matching, and TUI."
-  default_prompt: "Use $ciderfy-guidelines for Ciderfy code, tests, providers,
-    matching, configuration, HTTP clients, and TUI changes."

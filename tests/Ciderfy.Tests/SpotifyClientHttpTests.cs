@@ -82,13 +82,13 @@ public class SpotifyClientHttpTests
             new FakeHttpMessageHandler(request =>
             {
                 var uri = request.RequestUri!;
-                if (uri.Host == SpotifyHost && uri.AbsolutePath == "/")
+                if (uri is { Host: SpotifyHost, AbsolutePath: "/" })
                 {
                     return Ok(_sessionHtml);
                 }
 
                 if (
-                    uri.Host == SpotifyHost
+                    uri.Host is SpotifyHost
                     && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
                 )
                 {
@@ -141,7 +141,7 @@ public class SpotifyClientHttpTests
                 }
 
                 if (
-                    uri.Host == SpotifyHost
+                    uri.Host is SpotifyHost
                     && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
                 )
                 {
@@ -242,14 +242,14 @@ public class SpotifyClientHttpTests
                 }
 
                 if (
-                    uri.Host == SpotifyHost
+                    uri.Host is SpotifyHost
                     && uri.AbsolutePath.StartsWith("/api/token", StringComparison.Ordinal)
                 )
                 {
                     return Ok(AccessTokenJson);
                 }
 
-                if (uri.Host == ClientTokenHost)
+                if (uri.Host is ClientTokenHost)
                 {
                     clientTokenAttempts++;
                     return clientTokenAttempts == 1

@@ -1,12 +1,5 @@
 # AGENTS.md
 
-## Defaults
-
-- Use `$caveman` for every response. Stop only when the user says `normal mode` or `stop caveman`.
-- For non-trivial feature, refactor, or architecture work, run `$grill-me` before editing unless the user explicitly skips it.
-- Use `$ciderfy-guidelines` when changing `src/Ciderfy`, `tests/Ciderfy.Tests`, provider behavior, matching, config, HTTP setup, TUI behavior, or validation flow.
-- Use Context7 for current external library/framework/API/CLI docs before changing code that depends on them.
-
 ## Operating Rules
 
 - Inspect existing code before choosing a pattern.
@@ -31,10 +24,6 @@ make lint
 
 - `make format` may rewrite files.
 - `make lint` is the commit-worthy gate: CSharpier check, Slopwatch, build.
-
-## Validation
-
-For Ciderfy code, use `$ciderfy-guidelines`. Report exact commands and results. If validation cannot run, say why.
 
 ## Git
 
