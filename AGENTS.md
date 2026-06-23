@@ -1,13 +1,8 @@
 # AGENTS.md
 
-## Operating Rules
-
-- Inspect existing code before choosing a pattern.
-- Keep the smallest correct change and preserve current boundaries.
-- Ask one focused question when requirements, API behavior, or architecture direction are ambiguous.
-- Touch only files needed for the task; do not silently fix unrelated issues.
-- Remove code made obsolete by the change.
-- Never log or expose tokens, cookies, JWTs, user config, or obfuscated secret material.
+## Code style
+- Avoid unnecessary abstractions, indirections, wrappers/helper methods and intermediate variables: inline simple expressions and one-off construction unless naming significantly improves correctness, readability, reuse, or test diagnostics.
+- Avoid unnecessary fallbacks and backward compatibility layers: write code for the current, explicit requirements. Do not support legacy behaviors, deprecated APIs, or "just in case" edge cases unless explicitly requested.
 
 ## Commands
 
