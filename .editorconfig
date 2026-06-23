@@ -44,6 +44,9 @@ dotnet_diagnostic.IDE0130.severity = none
 # File-scoped namespaces
 csharp_style_namespace_declarations = file_scoped:warning
 
+# Braces
+csharp_prefer_braces = true:error
+
 # Qualification preferences
 dotnet_style_qualification_for_field = false:suggestion
 dotnet_style_qualification_for_property = false:suggestion
@@ -160,8 +163,10 @@ dotnet_diagnostic.RCS1241.severity = suggestion
 dotnet_diagnostic.RCS1242.severity = suggestion
 # Declare each type in separate file
 dotnet_diagnostic.RCS1060.severity = none
-# Add braces when expression spans multiple lines
-dotnet_diagnostic.RCS1001.severity = warning
+# Add braces (single-line statements)
+dotnet_diagnostic.RCS1001.severity = error
+# Add braces to if-else
+dotnet_diagnostic.RCS1007.severity = error
 # Add default access modifier
 dotnet_diagnostic.RCS1018.severity = warning
 # Remove redundant boolean literal

@@ -33,7 +33,9 @@ internal static class ConfigurationManagerExtensions
     {
         var configPath = Path.Combine(configDirectory, ConfigFileName);
         if (File.Exists(configPath))
+        {
             return;
+        }
 
         File.Copy(templatePath, configPath);
     }

@@ -42,13 +42,19 @@ internal sealed class ConfigurationFolderOpener : IConfigurationFolderOpener
     internal static ProcessStartInfo CreateStartInfo(string directory)
     {
         if (OperatingSystem.IsMacOS())
+        {
             return CreateStartInfo("open", directory);
+        }
 
         if (OperatingSystem.IsWindows())
+        {
             return CreateStartInfo("explorer.exe", directory);
+        }
 
         if (OperatingSystem.IsLinux())
+        {
             return CreateStartInfo("xdg-open", directory);
+        }
 
         throw new PlatformNotSupportedException("Opening a folder is not supported on this OS.");
     }

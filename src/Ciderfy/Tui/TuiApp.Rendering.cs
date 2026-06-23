@@ -85,7 +85,9 @@ internal sealed partial class TuiApp
         };
 
         if (statusSectionHeight > 0)
+        {
             rows.Add(new Layout(RegionBadgesAndStepper).Size(statusSectionHeight));
+        }
 
         rows.Add(new Layout(RegionMain));
         rows.Add(new Layout(RegionFooter).Size(footerHeight));
@@ -96,7 +98,9 @@ internal sealed partial class TuiApp
         layout[RegionSeparator].Update(new Rule { Style = new Style(Theme.GrayColor) });
 
         if (statusSectionHeight > 0)
+        {
             layout[RegionBadgesAndStepper].Update(BuildStatusSection());
+        }
 
         layout[RegionMain].Update(BuildMainContent(contentWidth, contentHeight));
 
@@ -163,7 +167,9 @@ internal sealed partial class TuiApp
     {
         var suggestions = Controller.CommandSuggestions;
         if (!ShowInput || suggestions.Count == 0)
+        {
             return ([], 0);
+        }
 
         var mandatoryChromeHeight =
             bannerHeight
@@ -179,7 +185,9 @@ internal sealed partial class TuiApp
         );
 
         if (visibleCount == 0)
+        {
             return ([], 0);
+        }
 
         var selectedIndex = Controller.SelectedCommandSuggestionIndex;
         var firstVisibleIndex = Math.Clamp(
@@ -358,7 +366,9 @@ internal sealed partial class TuiApp
                 : contentHeight;
 
         if (state is { ShowHelp: true, Phase: TuiTransferPhase.Idle })
+        {
             return BuildHelpSection(contentHeight);
+        }
 
         if (state.QueuedPlaylistUrls.Count > 0 && state.Phase is TuiTransferPhase.Idle)
         {
@@ -368,7 +378,9 @@ internal sealed partial class TuiApp
         var logs = LogSection.Render(Controller.Logs, width, logHeight);
 
         if (progressSection is not null)
+        {
             return new Rows(logs, new Text(string.Empty), progressSection);
+        }
 
         return logs;
     }
@@ -424,7 +436,9 @@ internal sealed partial class TuiApp
         var state = Controller.State;
 
         if (state.TransferTracks.Count == 0)
+        {
             return new Text("No results");
+        }
 
         var matched = state.AllResults.OfType<MatchResult.Matched>().Count();
         var total = state.TransferTracks.Count;
@@ -460,7 +474,9 @@ internal sealed partial class TuiApp
         var state = Controller.State;
 
         if (state is { ShowHelp: true, Phase: TuiTransferPhase.Idle })
+        {
             return HelpSection.EntryCount > GetVisibleHelpRows(contentHeight);
+        }
 
         if (state.Phase is not TuiTransferPhase.Done)
         {

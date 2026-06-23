@@ -52,10 +52,14 @@ internal static class StatusSection
             {
                 var escapedStep = Markup.Escape(step);
                 if (index < currentStep)
+                {
                     return $"[{Theme.Teal}]{escapedStep}[/]";
+                }
 
                 if (index == currentStep)
+                {
                     return $"[{Theme.Primary} bold]{escapedStep}[/]";
+                }
 
                 return $"[{Theme.Muted}]{escapedStep}[/]";
             }

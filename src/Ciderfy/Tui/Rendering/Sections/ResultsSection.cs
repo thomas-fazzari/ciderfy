@@ -74,7 +74,9 @@ internal static class ResultsSection
     internal static Markup RenderScrollHint(int offset, int total, int visible)
     {
         if (total <= visible)
+        {
             return new Markup($"[{Theme.Muted}]Press Enter to start a new transfer[/]");
+        }
 
         return new Markup(
             $"[{Theme.Muted}]{Theme.ArrowUp}/{Theme.ArrowDown} scroll[/]"

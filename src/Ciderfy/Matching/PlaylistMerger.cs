@@ -42,10 +42,14 @@ internal static class PlaylistMerger
     )
     {
         if (!string.IsNullOrWhiteSpace(userOverrideName))
+        {
             return userOverrideName;
+        }
 
         if (playlists.Count == 1 && !string.IsNullOrWhiteSpace(playlists[0].Name))
+        {
             return playlists[0].Name;
+        }
 
         var date = today ?? DateOnly.FromDateTime(DateTime.UtcNow);
         return $"Merged Playlist - {date:yyyy-MM-dd}";

@@ -53,9 +53,13 @@ internal sealed class PlaylistTransferService(
         foreach (var track in enriched)
         {
             if (!string.IsNullOrEmpty(track.Isrc))
+            {
                 withIsrc.Add(track);
+            }
             else
+            {
                 unmatched.Add(track);
+            }
         }
 
         // Batch ISRC lookup on Apple Music
@@ -69,9 +73,13 @@ internal sealed class PlaylistTransferService(
         foreach (var track in withIsrc)
         {
             if (isrcMap.TryGetValue(track.Isrc!, out var appleTrack))
+            {
                 matched.Add(new MatchResult.Matched(track, appleTrack, MatchMethod.Isrc, 1.0));
+            }
             else
+            {
                 unmatched.Add(track);
+            }
         }
 
         return (matched, unmatched);
@@ -130,8 +138,11 @@ internal sealed class PlaylistTransferService(
         var playlistId = await appleMusicClient
             .CreatePlaylistAsync(name, ct: ct)
             .ConfigureAwait(false);
+
         if (playlistId is null)
+        {
             return new PlaylistCreateResult(null, false);
+        }
 
         var success = await appleMusicClient
             .AddTracksToPlaylistAsync(playlistId, trackIds, ct)

@@ -35,9 +35,13 @@ internal sealed class LogBuffer(int capacity = 500)
         _entries[index] = new LogEntry(kind, message.Trim());
 
         if (_count < capacity)
+        {
             _count++;
+        }
         else
+        {
             _head = (_head + 1) % capacity;
+        }
     }
 
     internal void Clear()
@@ -53,13 +57,17 @@ internal sealed class LogBuffer(int capacity = 500)
     {
         var take = Math.Min(height, _count);
         if (take == 0)
+        {
             return [];
+        }
 
         var buffer = new LogEntry[take];
         var startOffset = _count - take; // how many entries to skip from the oldest
 
         for (var i = 0; i < take; i++)
+        {
             buffer[i] = _entries[(_head + startOffset + i) % capacity];
+        }
 
         return buffer;
     }

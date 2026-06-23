@@ -183,7 +183,9 @@ public class PlaylistTransferServiceHttpTests
                 var path = request.RequestUri!.AbsolutePath;
 
                 if (path.EndsWith("/playlists", StringComparison.Ordinal))
+                {
                     return Ok("""{"data": [{"id": "pl-789"}]}""");
+                }
 
                 return path.EndsWith("/tracks", StringComparison.Ordinal)
                     ? Ok("{}")

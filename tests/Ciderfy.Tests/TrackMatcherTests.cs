@@ -37,15 +37,15 @@ public class TrackMatcherTests
 
     // NormalizeForComparison
     [Theory]
-    [InlineData("Don't Stop (Remix) [Deluxe Edition]", "dont stop")]
-    [InlineData("We've Gotta Get out of This Place", "weve gotta get out of this place")]
-    [InlineData("Rock & Roll", "rock and roll")]
-    [InlineData("HELLO WORLD", "hello world")]
-    [InlineData("Hush – Deep Purple", "hush - deep purple")]
-    [InlineData("My Girl\u2019s Name", "my girls name")]
-    [InlineData("Song feat. Artist", "song")]
-    [InlineData("Song ft. Other Artist", "song")]
-    [InlineData("  spaces  everywhere  ", "spaces  everywhere")]
+    [InlineData("Don't Stop (Remix) [Deluxe Edition]", "DONT STOP")]
+    [InlineData("We've Gotta Get out of This Place", "WEVE GOTTA GET OUT OF THIS PLACE")]
+    [InlineData("Rock & Roll", "ROCK AND ROLL")]
+    [InlineData("HELLO WORLD", "HELLO WORLD")]
+    [InlineData("Hush – Deep Purple", "HUSH - DEEP PURPLE")]
+    [InlineData("My Girl\u2019s Name", "MY GIRLS NAME")]
+    [InlineData("Song feat. Artist", "SONG")]
+    [InlineData("Song ft. Other Artist", "SONG")]
+    [InlineData("  spaces  everywhere  ", "SPACES  EVERYWHERE")]
     public void NormalizeForComparison_NormalizesCorrectly(string input, string expected)
     {
         var result = TrackMatcher.NormalizeForComparison(input);
@@ -70,9 +70,13 @@ public class TrackMatcherTests
         var result = TrackMatcher.TitleSimilarity(a, b);
 
         if (expected < 0)
+        {
             Assert.True(result < 0.7, $"Expected < 0.7 but got {result}");
+        }
         else
+        {
             Assert.Equal(expected, result, precision: 1);
+        }
     }
 
     [Fact]
@@ -99,9 +103,13 @@ public class TrackMatcherTests
         var result = TrackMatcher.ArtistSimilarity(a, b);
 
         if (expected < 0)
+        {
             Assert.True(result < 0.7, $"Expected < 0.7 but got {result}");
+        }
         else
+        {
             Assert.Equal(expected, result, precision: 1);
+        }
     }
 
     [Fact]

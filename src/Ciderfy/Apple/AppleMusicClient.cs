@@ -60,18 +60,24 @@ internal sealed class AppleMusicClient(
             var json = await GetWithRateLimitAsync(url, authHeaders, ct).ConfigureAwait(false);
 
             if (json is null)
+            {
                 continue;
+            }
 
             using var doc = JsonDocument.Parse(json);
 
             if (!doc.RootElement.TryGetProperty("data", out var data))
+            {
                 continue;
+            }
 
             foreach (var item in data.EnumerateArray())
             {
                 var track = ParseTrack(item);
                 if (track?.Isrc is not null)
+                {
                     result.TryAdd(track.Isrc, track);
+                }
             }
         }
 
@@ -92,7 +98,9 @@ internal sealed class AppleMusicClient(
         var tracks = new List<AppleMusicTrack>();
 
         if (json is null)
+        {
             return tracks;
+        }
 
         using var doc = JsonDocument.Parse(json);
 
@@ -105,12 +113,9 @@ internal sealed class AppleMusicClient(
             return tracks;
         }
 
-        foreach (var item in data.EnumerateArray())
-        {
-            var track = ParseTrack(item);
-            if (track is not null)
-                tracks.Add(track);
-        }
+        tracks.AddRange(
+            data.EnumerateArray().Select(item => ParseTrack(item)).OfType<AppleMusicTrack>()
+        );
 
         return tracks;
     }
@@ -140,12 +145,16 @@ internal sealed class AppleMusicClient(
             .ConfigureAwait(false);
 
         if (responseJson is null)
+        {
             return null;
+        }
 
         using var doc = JsonDocument.Parse(responseJson);
 
         if (doc.RootElement.TryGetProperty("data", out var data) && data.GetArrayLength() > 0)
+        {
             return data[0].TryGetProperty("id", out var id) ? id.GetString() : null;
+        }
 
         return null;
     }
@@ -172,7 +181,9 @@ internal sealed class AppleMusicClient(
             var response = await PostWithRateLimitAsync(url, json, authHeaders, ct)
                 .ConfigureAwait(false);
             if (response is null)
+            {
                 return false;
+            }
         }
 
         return true;
@@ -181,7 +192,9 @@ internal sealed class AppleMusicClient(
     private Dictionary<string, string> GenerateAuthHeaders(bool requireUserToken)
     {
         if (!tokenCache.HasValidDeveloperToken)
+        {
             throw new AppleMusicUnauthorizedException();
+        }
 
         var headers = new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -189,7 +202,9 @@ internal sealed class AppleMusicClient(
         };
 
         if (!requireUserToken)
+        {
             return headers;
+        }
 
         if (!tokenCache.HasValidUserToken)
         {
@@ -242,7 +257,9 @@ internal sealed class AppleMusicClient(
     )
     {
         foreach (var (key, value) in headers)
+        {
             request.Headers.TryAddWithoutValidation(key, value);
+        }
     }
 
     private async Task<string?> SendAsync(
@@ -251,46 +268,52 @@ internal sealed class AppleMusicClient(
     )
     {
         using var lease = await _rateLimiter.AcquireAsync(permitCount: 1, ct).ConfigureAwait(false);
-        ct.ThrowIfCancellationRequested();
-
         using var response = await sendAsync(ct).ConfigureAwait(false);
 
         if (response.StatusCode is HttpStatusCode.TooManyRequests)
-            throw new AppleMusicRateLimitException(GetRetryAfterSeconds(response));
-
-        if (response.StatusCode is HttpStatusCode.Unauthorized)
-            throw new AppleMusicUnauthorizedException();
-
-        if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
-            throw new HttpRequestException(
-                $"Apple Music API returned {(int)response.StatusCode} {response.StatusCode}"
-                    + (string.IsNullOrWhiteSpace(body) ? string.Empty : $": {body}"),
-                inner: null,
-                response.StatusCode
-            );
+            throw new AppleMusicRateLimitException(GetRetryAfterSeconds(response));
         }
 
-        return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        if (response.StatusCode is HttpStatusCode.Unauthorized)
+        {
+            throw new AppleMusicUnauthorizedException();
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        }
+
+        var body = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+        throw new HttpRequestException(
+            $"Apple Music API returned {(int)response.StatusCode} {response.StatusCode}"
+                + (string.IsNullOrWhiteSpace(body) ? string.Empty : $": {body}"),
+            inner: null,
+            response.StatusCode
+        );
     }
 
     private static int? GetRetryAfterSeconds(HttpResponseMessage response)
     {
         var retryAfter = response.Headers.RetryAfter;
         if (retryAfter is null)
-            return null;
-
-        if (retryAfter.Delta is { } delta)
-            return Math.Max(1, (int)Math.Ceiling(delta.TotalSeconds));
-
-        if (retryAfter.Date is { } date)
         {
-            var seconds = (int)Math.Ceiling((date - DateTimeOffset.UtcNow).TotalSeconds);
-            return seconds > 0 ? seconds : null;
+            return null;
         }
 
-        return null;
+        if (retryAfter.Delta is { } delta)
+        {
+            return Math.Max(1, (int)Math.Ceiling(delta.TotalSeconds));
+        }
+
+        if (retryAfter.Date is not { } date)
+        {
+            return null;
+        }
+
+        var seconds = (int)Math.Ceiling((date - DateTimeOffset.UtcNow).TotalSeconds);
+        return seconds > 0 ? seconds : null;
     }
 
     internal static AppleMusicTrack? ParseTrack(JsonElement element)

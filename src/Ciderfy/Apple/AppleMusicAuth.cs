@@ -26,7 +26,9 @@ internal sealed partial class AppleMusicAuth(
     public async Task<string> GetDeveloperTokenAsync(CancellationToken ct = default)
     {
         if (tokenCache.HasValidDeveloperToken)
+        {
             return tokenCache.DeveloperToken!;
+        }
 
         var token = await ExtractDeveloperTokenFromWebAsync(ct).ConfigureAwait(false);
 
@@ -82,17 +84,23 @@ internal sealed partial class AppleMusicAuth(
                 foreach (var token in JwtTokenRegex().Matches(js).Select(m => m.Value))
                 {
                     if (!IsAppleMusicJwt(token))
+                    {
                         continue;
+                    }
 
                     var expiry = GetJwtExpiry(token);
                     if (expiry is null)
-                        continue;
-
-                    if (expiry.Value > bestCandidateExpiry)
                     {
-                        bestCandidate = token;
-                        bestCandidateExpiry = expiry.Value;
+                        continue;
                     }
+
+                    if (expiry.Value <= bestCandidateExpiry)
+                    {
+                        continue;
+                    }
+
+                    bestCandidate = token;
+                    bestCandidateExpiry = expiry.Value;
                 }
             }
             catch (Exception e)
@@ -105,7 +113,9 @@ internal sealed partial class AppleMusicAuth(
         }
 
         if (bestCandidate is not null)
+        {
             return bestCandidate;
+        }
 
         throw new InvalidOperationException(
             "Could not extract Apple Music developer token from web player. "
@@ -120,7 +130,9 @@ internal sealed partial class AppleMusicAuth(
         {
             var parts = token.Split('.');
             if (parts.Length != 3)
+            {
                 return false;
+            }
 
             var headerJson = Encoding.UTF8.GetString(Base64Url.DecodeFromChars(parts[0]));
             using var header = JsonDocument.Parse(headerJson);
@@ -162,13 +174,17 @@ internal sealed partial class AppleMusicAuth(
         {
             var parts = token.Split('.');
             if (parts.Length != 3)
+            {
                 return null;
+            }
 
             var payloadJson = Encoding.UTF8.GetString(Base64Url.DecodeFromChars(parts[1]));
             using var payload = JsonDocument.Parse(payloadJson);
 
             if (payload.RootElement.TryGetProperty("exp", out var exp))
+            {
                 return DateTimeOffset.FromUnixTimeSeconds(exp.GetInt64());
+            }
 
             return null;
         }

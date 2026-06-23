@@ -18,13 +18,19 @@ internal sealed class HttpUrlAttribute : ValidationAttribute
     public override bool IsValid(object? value)
     {
         if (value is null)
+        {
             return true;
+        }
 
         if (value is not string text)
+        {
             return false;
+        }
 
         if (text.Length == 0)
+        {
             return true;
+        }
 
         return Uri.TryCreate(text, UriKind.Absolute, out var uri)
             && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
@@ -50,10 +56,14 @@ internal sealed class EndsWithSlashAttribute : ValidationAttribute
     public override bool IsValid(object? value)
     {
         if (value is null)
+        {
             return true;
+        }
 
         if (value is not string text)
+        {
             return false;
+        }
 
         return text.Length == 0 || text.EndsWith('/');
     }
@@ -77,7 +87,9 @@ internal sealed class HeaderNameAttribute : ValidationAttribute
     public override bool IsValid(object? value)
     {
         if (value is null)
+        {
             return true;
+        }
 
         return value is string text && (text.Length == 0 || text.All(IsTokenCharacter));
     }

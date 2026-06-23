@@ -191,13 +191,19 @@ public class ConfigurationTests
     private static string GetExpectedExplorerFileName()
     {
         if (OperatingSystem.IsMacOS())
+        {
             return "open";
+        }
 
         if (OperatingSystem.IsWindows())
+        {
             return "explorer.exe";
+        }
 
         if (OperatingSystem.IsLinux())
+        {
             return "xdg-open";
+        }
 
         throw new PlatformNotSupportedException();
     }

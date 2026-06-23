@@ -249,7 +249,9 @@ public class AppleMusicAuthTests
         {
             var directory = Path.GetDirectoryName(Value);
             if (!string.IsNullOrEmpty(directory) && Directory.Exists(directory))
+            {
                 Directory.Delete(directory, recursive: true);
+            }
         }
     }
 }

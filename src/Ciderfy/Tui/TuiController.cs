@@ -29,7 +29,9 @@ internal sealed class TuiController(
         var effects = new List<ITuiEffect>();
 
         if (msg is TransferMessage { TransferId: var transferId } && transferId != _transferId)
+        {
             return effects;
+        }
 
         switch (msg)
         {
@@ -96,10 +98,14 @@ internal sealed class TuiController(
     private void HandleKey(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         if (HandleQuitShortcut(key, effects))
+        {
             return;
+        }
 
         if (TryHandlePhaseInput(key, effects) || State.Phase is not TuiTransferPhase.Idle)
+        {
             return;
+        }
 
         HandleGeneralInput(key, effects);
     }
@@ -107,7 +113,9 @@ internal sealed class TuiController(
     private bool TryHandlePhaseInput(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         if (TryHandleTransferCancelInput(key, effects))
+        {
             return true;
+        }
 
         return State is { ShowHelp: true, Phase: TuiTransferPhase.Idle }
             ? TryHandleHelpInput(key)
@@ -123,7 +131,9 @@ internal sealed class TuiController(
     private bool TryHandleTransferCancelInput(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         if (key.Key is not ConsoleKey.Escape)
+        {
             return false;
+        }
 
         if (
             State.Phase
@@ -166,7 +176,9 @@ internal sealed class TuiController(
     private bool HandleQuitShortcut(ConsoleKeyInfo key, List<ITuiEffect> effects)
     {
         if (key is not { Key: ConsoleKey.C, Modifiers: ConsoleModifiers.Control })
+        {
             return false;
+        }
 
         RequestQuit(effects);
         return true;
@@ -177,7 +189,9 @@ internal sealed class TuiController(
         if (key.Key is ConsoleKey.Enter)
         {
             if (State.TransferTracks.Count == 0)
+            {
                 return true;
+            }
 
             var tracks = State.TransferTracks.ToList();
             var storefront = State.Storefront;
@@ -228,7 +242,9 @@ internal sealed class TuiController(
         {
             case ConsoleKey.Enter:
                 if (TryCompleteCommandSuggestion())
+                {
                     break;
+                }
 
                 HandleEnter(effects);
                 break;
@@ -243,7 +259,10 @@ internal sealed class TuiController(
                 break;
             case ConsoleKey.Backspace:
                 if (InputBuffer.Length > 0)
+                {
                     InputBuffer.Remove(InputBuffer.Length - 1, 1);
+                }
+
                 ClampCommandSuggestionSelection();
                 break;
             case ConsoleKey.Escape:
@@ -291,11 +310,15 @@ internal sealed class TuiController(
     {
         var suggestions = CommandSuggestions;
         if (suggestions.Count == 0)
+        {
             return false;
+        }
 
         var input = InputBuffer.ToString();
         if (suggestions.Any(s => s.Completion.Equals(input, StringComparison.OrdinalIgnoreCase)))
+        {
             return false;
+        }
 
         var selectedSuggestion = suggestions[GetSelectedCommandSuggestionIndex(suggestions)];
         CompleteCommandSuggestion(selectedSuggestion);
@@ -306,7 +329,9 @@ internal sealed class TuiController(
     {
         var suggestions = CommandSuggestions;
         if (suggestions.Count == 0)
+        {
             return;
+        }
 
         CompleteCommandSuggestion(suggestions[GetSelectedCommandSuggestionIndex(suggestions)]);
     }
@@ -321,12 +346,16 @@ internal sealed class TuiController(
     private int GetSelectedCommandSuggestionIndex(IReadOnlyList<TuiCommandSuggestion> suggestions)
     {
         if (suggestions.Count == 0)
+        {
             return 0;
+        }
 
         for (var i = 0; i < suggestions.Count; i++)
         {
             if (suggestions[i].Completion == _selectedCommandSuggestionCompletion)
+            {
                 return i;
+            }
         }
 
         return GetDefaultCommandSuggestionIndex(suggestions);
@@ -338,7 +367,9 @@ internal sealed class TuiController(
         for (var i = 0; i < suggestions.Count; i++)
         {
             if (suggestions[i].Completion.Equals(input, StringComparison.OrdinalIgnoreCase))
+            {
                 return i;
+            }
         }
 
         return 0;
@@ -349,7 +380,9 @@ internal sealed class TuiController(
         InputBuffer.Clear();
         _selectedCommandSuggestionCompletion = null;
         if (!State.AwaitingUserToken)
+        {
             return;
+        }
 
         State.AwaitingUserToken = false;
         Logs.Append(LogKind.Info, "Authentication cancelled.");
@@ -361,7 +394,9 @@ internal sealed class TuiController(
         {
             case 'y' or '\r' or '\n':
                 if (State.UnmatchedTracks.Count == 0)
+                {
                     return true;
+                }
 
                 var unmatchedTracks = State.UnmatchedTracks.ToList();
                 var storefront = State.Storefront;
@@ -378,7 +413,9 @@ internal sealed class TuiController(
                 if (State.UnmatchedTracks.Count > 0)
                 {
                     foreach (var t in State.UnmatchedTracks)
+                    {
                         State.TextResults.Add(new MatchResult.NotFound(t, "Skipped"));
+                    }
                 }
 
                 State.Phase = TuiTransferPhase.CreatingPlaylist;
@@ -406,7 +443,9 @@ internal sealed class TuiController(
         raw = raw.Trim();
 
         if (string.IsNullOrEmpty(raw))
+        {
             return;
+        }
 
         if (raw.StartsWith('/'))
         {
@@ -652,7 +691,9 @@ internal sealed class TuiController(
             $"{msg.Matched.Count}/{State.TransferTracks.Count} matched via ISRC"
         );
         if (msg.Unmatched.Count > 0)
+        {
             Logs.Append(LogKind.Info, $"{msg.Unmatched.Count} remaining");
+        }
 
         Logs.Append(LogKind.Separator, string.Empty);
 
@@ -807,11 +848,17 @@ internal sealed class TuiController(
         foreach (var track in State.TransferTracks)
         {
             if (isrcMap.TryGetValue(track.SpotifyId, out var isrcMatch))
+            {
                 allResults.Add(isrcMatch);
+            }
             else if (textMap.TryGetValue(track.SpotifyId, out var textMatch))
+            {
                 allResults.Add(textMatch);
+            }
             else
+            {
                 allResults.Add(new MatchResult.NotFound(track, "Skipped"));
+            }
         }
 
         return allResults;

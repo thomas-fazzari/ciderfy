@@ -15,7 +15,9 @@ internal static partial class TuiCommands
     )
     {
         if (awaitingUserToken || !input.StartsWith('/'))
+        {
             return [];
+        }
 
         return
         [
@@ -31,7 +33,9 @@ internal static partial class TuiCommands
         var trimmed = raw.Trim();
         var parts = trimmed.Split(ArgumentSeparator, 2, StringSplitOptions.RemoveEmptyEntries);
         if (parts.Length == 0)
+        {
             return new TuiCommand(TuiCommandKind.Unknown, string.Empty, Argument: null);
+        }
 
         var name = parts[0];
         var argument = parts.Length > 1 ? parts[1].Trim() : null;
@@ -39,10 +43,14 @@ internal static partial class TuiCommands
         var definition = _definitions.SingleOrDefault(d => d.MatchesName(name));
 
         if (definition is null)
+        {
             return new TuiCommand(TuiCommandKind.Unknown, name, Argument: null);
+        }
 
         if (argument is not null && !definition.AllowsArguments)
+        {
             return new TuiCommand(TuiCommandKind.Unknown, trimmed, Argument: null);
+        }
 
         return new TuiCommand(definition.Kind, name, argument);
     }

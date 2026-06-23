@@ -7,7 +7,9 @@ internal sealed partial class TuiApp
         while (!ct.IsCancellationRequested)
         {
             if (!TryReadKey(out var key))
+            {
                 continue;
+            }
 
             _channel.Writer.TryWrite(new KeyPressedMsg(key));
         }

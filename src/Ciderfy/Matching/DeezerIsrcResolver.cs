@@ -69,7 +69,9 @@ internal sealed class DeezerIsrcResolver(
 
         var json = await GetWithRateLimitAsync(url, ct).ConfigureAwait(false);
         if (json is null)
+        {
             return null;
+        }
 
         DeezerSearchResponse? response;
         try
@@ -117,7 +119,9 @@ internal sealed class DeezerIsrcResolver(
                 .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
+            {
                 return null;
+            }
 
             return await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         }

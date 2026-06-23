@@ -84,6 +84,7 @@ internal sealed partial class SpotifyClient(
                 limit = PlaylistPageSize,
                 enableWatchFeedEntrypoint = false,
             };
+
             using var response = await QueryGraphQlAsync(
                     _options.PlaylistQueryHash,
                     "fetchPlaylist",
@@ -93,14 +94,19 @@ internal sealed partial class SpotifyClient(
                 .ConfigureAwait(false);
 
             var (pageName, pageTracks, totalCount) = ParsePlaylistPage(response);
+
             if (offset == 0)
+            {
                 name = pageName;
+            }
 
             tracks.AddRange(pageTracks);
             offset += PlaylistPageSize;
 
             if (offset >= totalCount)
+            {
                 break;
+            }
         }
 
         return new SpotifyPlaylist(name, tracks);
@@ -121,18 +127,21 @@ internal sealed partial class SpotifyClient(
 
     private async Task EnsureAuthenticatedAsync(CancellationToken ct)
     {
-        if (_authState is not null)
+        if (Volatile.Read(ref _authState) is not null)
+        {
             return;
+        }
 
         await _authenticationLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
-#pragma warning disable CA1508
-            if (_authState is not null)
-#pragma warning restore CA1508
+            if (Volatile.Read(ref _authState) is not null)
+            {
                 return;
+            }
 
-            _authState = await InitializeAsync(ct).ConfigureAwait(false);
+            var authState = await InitializeAsync(ct).ConfigureAwait(false);
+            Volatile.Write(ref _authState, authState);
         }
         finally
         {
@@ -179,7 +188,9 @@ internal sealed partial class SpotifyClient(
         var configMatch = AppServerConfigRegex().Match(html);
 
         if (!configMatch.Success)
+        {
             return new SessionInfoState(clientVersion, ExtractDeviceIdFromCookies());
+        }
 
         var json = Encoding.UTF8.GetString(Convert.FromBase64String(configMatch.Groups[1].Value));
         using var doc = JsonDocument.Parse(json);
@@ -299,7 +310,9 @@ internal sealed partial class SpotifyClient(
         request.Headers.Add(HttpHeaderNames.Authorization, $"Bearer {authState.AccessToken}");
         request.Headers.Add(_options.ClientTokenHeader, authState.ClientToken);
         if (!string.IsNullOrWhiteSpace(authState.ClientVersion))
+        {
             request.Headers.Add(_options.AppVersionHeader, authState.ClientVersion);
+        }
 
         using var response = await httpClient.SendAsync(request, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
@@ -322,11 +335,15 @@ internal sealed partial class SpotifyClient(
     {
         Span<byte> transformed = stackalloc byte[_totpSecret.Length];
         for (var i = 0; i < _totpSecret.Length; i++)
+        {
             transformed[i] = (byte)(_totpSecret[i] ^ ((i % 33) + 9));
+        }
 
         var sb = new StringBuilder(transformed.Length * 3);
         foreach (var b in transformed)
+        {
             sb.Append(b);
+        }
 
         var key = Encoding.UTF8.GetBytes(sb.ToString());
         return new Totp(key, step: 30).ComputeTotp();
@@ -379,7 +396,9 @@ internal sealed partial class SpotifyClient(
 
         var title = itemData.TryGetProperty("name", out var tn) ? tn.GetString() : null;
         if (string.IsNullOrWhiteSpace(title))
+        {
             return null;
+        }
 
         return new SpotifyTrack
         {

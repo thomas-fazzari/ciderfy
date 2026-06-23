@@ -20,7 +20,9 @@ internal record SpotifyUrlInfo(string Id)
         result = null;
 
         if (string.IsNullOrWhiteSpace(url))
+        {
             return false;
+        }
 
         result = url.StartsWith(SpotifyUriScheme, StringComparison.OrdinalIgnoreCase)
             ? ParseSpotifyUri(url)
@@ -36,7 +38,9 @@ internal record SpotifyUrlInfo(string Id)
 
         var separatorIndex = afterScheme.IndexOf(':');
         if (separatorIndex < 1 || separatorIndex >= afterScheme.Length - 1)
+        {
             return null;
+        }
 
         var typeSpan = afterScheme[..separatorIndex];
         var id = afterScheme[(separatorIndex + 1)..];
@@ -47,23 +51,31 @@ internal record SpotifyUrlInfo(string Id)
     private static SpotifyUrlInfo? ParseSpotifyUrl(string url)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) || !IsSpotifyHost(uri.Host))
+        {
             return null;
+        }
 
         var segments = uri.AbsolutePath.AsSpan().Trim('/');
 
         if (segments.StartsWith(EmbedSegment, StringComparison.OrdinalIgnoreCase))
+        {
             segments = segments[EmbedSegment.Length..].TrimStart('/');
+        }
 
         if (segments.StartsWith(IntlPrefix, StringComparison.OrdinalIgnoreCase))
         {
             var slashIndex = segments.IndexOf('/');
             if (slashIndex > 0)
+            {
                 segments = segments[(slashIndex + 1)..];
+            }
         }
 
         var typeEnd = segments.IndexOf('/');
         if (typeEnd < 1)
+        {
             return null;
+        }
 
         var typeSpan = segments[..typeEnd];
         var idSegment = segments[(typeEnd + 1)..];
@@ -72,7 +84,9 @@ internal record SpotifyUrlInfo(string Id)
         var id = idEnd >= 0 ? idSegment[..idEnd] : idSegment;
 
         if (id.IsEmpty)
+        {
             return null;
+        }
 
         return IsPlaylistType(typeSpan) ? new SpotifyUrlInfo(id.ToString()) : null;
     }

@@ -35,10 +35,14 @@ internal static class LogSection
         }
 
         if (lines.Count == 0)
+        {
             lines.Add($"[{Theme.Muted}]No activity yet[/]");
+        }
 
         while (lines.Count < height)
+        {
             lines.Add(string.Empty);
+        }
 
         return new Markup(string.Join('\n', lines));
     }

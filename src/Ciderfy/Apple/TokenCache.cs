@@ -41,7 +41,9 @@ internal sealed class TokenCache
         try
         {
             if (!File.Exists(cachePath))
+            {
                 return new TokenCache(cachePath);
+            }
 
             var json = File.ReadAllText(cachePath);
             var cache =
@@ -63,7 +65,9 @@ internal sealed class TokenCache
         {
             var cacheDirectory = Path.GetDirectoryName(_cachePath);
             if (!string.IsNullOrEmpty(cacheDirectory))
+            {
                 Directory.CreateDirectory(cacheDirectory);
+            }
 
             var json = JsonSerializer.Serialize(this, TokenCacheJsonContext.Default.TokenCache);
             File.WriteAllText(tempPath, json);
@@ -89,7 +93,9 @@ internal sealed class TokenCache
         try
         {
             if (!File.Exists(tempPath))
+            {
                 return true;
+            }
 
             File.Delete(tempPath);
             return true;

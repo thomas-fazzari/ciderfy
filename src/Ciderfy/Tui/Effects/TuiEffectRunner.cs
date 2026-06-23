@@ -27,7 +27,9 @@ internal sealed class TuiEffectRunner(
     internal void ExecuteAll(IEnumerable<ITuiEffect> effects)
     {
         foreach (var effect in effects)
+        {
             Execute(effect);
+        }
     }
 
     private void Execute(ITuiEffect effect)
@@ -179,7 +181,9 @@ internal sealed class TuiEffectRunner(
                     var transferService = services.GetRequiredService<PlaylistTransferService>();
 
                     if (!tokenCache.HasValidDeveloperToken)
+                    {
                         await auth.GetDeveloperTokenAsync(token).ConfigureAwait(false);
+                    }
 
                     if (!tokenCache.HasValidUserToken)
                     {

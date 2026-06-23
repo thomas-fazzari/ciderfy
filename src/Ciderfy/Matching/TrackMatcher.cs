@@ -30,7 +30,9 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         var queries = new List<string>(3) { $"{cleanTitle} {spotifyTrack.Artist}" };
 
         if (!string.Equals(primaryTitle, normalizedClean, StringComparison.Ordinal))
+        {
             queries.Add($"{primaryTitle} {spotifyTrack.Artist}");
+        }
 
         queries.Add(cleanTitle);
 
@@ -41,7 +43,9 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
             var match = await TryTextMatchAsync(spotifyTrack, query, storefront, ct)
                 .ConfigureAwait(false);
             if (match is not null)
+            {
                 return match;
+            }
         }
 
         return new MatchResult.NotFound(
@@ -70,7 +74,9 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     internal static double DurationMultiplier(int spotifyMs, int appleMs)
     {
         if (spotifyMs <= 0 || appleMs <= 0)
+        {
             return 1.0;
+        }
 
         var diffSeconds = Math.Abs(spotifyMs - appleMs) / 1000.0;
 
@@ -90,23 +96,31 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     internal static double TitleSimilarity(string a, string b)
     {
         if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+        {
             return 0;
+        }
 
         var normalA = NormalizeForComparison(a);
         var normalB = NormalizeForComparison(b);
 
         if (QuickSimilarity(normalA, normalB) is { } score)
+        {
             return score;
+        }
 
         // Compare primary title segments
         var primaryA = ExtractPrimaryTitle(normalA);
         var primaryB = ExtractPrimaryTitle(normalB);
 
         if (primaryA == primaryB)
+        {
             return 0.95;
+        }
 
         if (ContainsEither(primaryA, primaryB))
+        {
             return 0.85;
+        }
 
         // Take the best between primary segment and Jaro-Winkler
         return Math.Max(
@@ -121,7 +135,9 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     internal static double ArtistSimilarity(string a, string b)
     {
         if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b))
+        {
             return 0;
+        }
 
         var normalA = NormalizeArtistForComparison(a);
         var normalB = NormalizeArtistForComparison(b);
@@ -148,9 +164,7 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     internal static string NormalizeForComparison(string s)
     {
         s = StripVersionSuffix(s);
-#pragma warning disable CA1308
-        s = s.ToLowerInvariant();
-#pragma warning restore CA1308
+        s = s.ToUpperInvariant();
 
         // Normalize en-dash and em-dash to hyphen
         s = s.Replace('\u2013', '-').Replace('\u2014', '-');
@@ -169,9 +183,8 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
         // Remove featuring clauses
         s = FeaturingRegex().Replace(s, string.Empty);
 
-        // Normalize "&" to "and"
-        s = s.Replace(" & ", " and ", StringComparison.Ordinal);
-
+        // Normalize "&" to "AND"
+        s = s.Replace(" & ", " AND ", StringComparison.Ordinal);
         return s.Trim();
     }
 
@@ -217,9 +230,15 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     private static double? QuickSimilarity(string a, string b)
     {
         if (a == b)
+        {
             return 1.0;
+        }
+
         if (ContainsEither(a, b))
+        {
             return 0.9;
+        }
+
         return null;
     }
 
@@ -233,8 +252,10 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     {
         var normalized = NormalizeForComparison(s);
 
-        if (normalized.StartsWith("the ", StringComparison.Ordinal))
+        if (normalized.StartsWith("THE ", StringComparison.Ordinal))
+        {
             normalized = normalized[4..];
+        }
 
         return normalized;
     }
@@ -249,7 +270,9 @@ internal sealed partial class TrackMatcher(AppleMusicClient appleMusicClient)
     {
         var slashIdx = normalized.IndexOf(" / ", StringComparison.Ordinal);
         if (slashIdx > 0)
+        {
             return normalized[..slashIdx].Trim();
+        }
 
         var dashIdx = normalized.IndexOf(" - ", StringComparison.Ordinal);
 

@@ -32,7 +32,9 @@ internal static class HelpSection
     internal static Markup RenderScrollHint(int offset, int total, int visible)
     {
         if (total <= visible)
+        {
             return new Markup(string.Empty);
+        }
 
         return new Markup(
             $"[{Theme.Muted}]{Theme.ArrowUp}/{Theme.ArrowDown} scroll[/]{RenderHelpers.BuildScrollPositionInfo(offset, total, visible)}"
@@ -42,11 +44,15 @@ internal static class HelpSection
     private static string RenderUsage(string usage)
     {
         if (string.IsNullOrEmpty(usage))
+        {
             return string.Empty;
+        }
 
         var separatorIndex = usage.IndexOf(' ', StringComparison.Ordinal);
         if (separatorIndex < 0)
+        {
             return $"[{Theme.Primary}]{Markup.Escape(usage)}[/]";
+        }
 
         var command = usage[..separatorIndex];
         var arguments = usage[(separatorIndex + 1)..];
