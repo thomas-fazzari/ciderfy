@@ -153,6 +153,8 @@ dotnet_analyzer_diagnostic.category-roslynator.severity = warning
 
 # Roslynator: per-rule overrides
 # Doc comment rules
+# Missing XML comment for publicly visible type/member: app is not a public API package.
+dotnet_diagnostic.CS1591.severity = none
 dotnet_diagnostic.RCS1005.severity = suggestion
 dotnet_diagnostic.RCS1021.severity = suggestion
 dotnet_diagnostic.RCS1139.severity = none
