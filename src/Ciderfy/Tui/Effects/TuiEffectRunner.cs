@@ -13,7 +13,7 @@ namespace Ciderfy.Tui;
 internal sealed class TuiEffectRunner(
     TokenCache tokenCache,
     IServiceScopeFactory scopeFactory,
-    IConfigurationFolderOpener configurationFolderOpener,
+    ConfigurationFolderOpener configurationFolderOpener,
     ChannelWriter<TuiMessage> messages,
     Action cancelApp,
     CancellationToken appToken
@@ -85,7 +85,7 @@ internal sealed class TuiEffectRunner(
             configurationFolderOpener.Open();
             messages.TryWrite(new ConfigOpenedMsg(configurationFolderOpener.ConfigDirectory));
         }
-        catch (Exception e) when (configurationFolderOpener.IsOpenFailure(e))
+        catch (Exception e) when (ConfigurationFolderOpener.IsOpenFailure(e))
         {
             messages.TryWrite(new ConfigOpenFailedMsg(e.Message));
         }

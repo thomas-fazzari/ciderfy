@@ -52,7 +52,7 @@ internal sealed class PlaylistTransferService(
 
         foreach (var track in enriched)
         {
-            if (!string.IsNullOrEmpty(track.Isrc))
+            if (GetCandidateIsrcs(track).Count > 0)
             {
                 withIsrc.Add(track);
             }
@@ -66,15 +66,20 @@ internal sealed class PlaylistTransferService(
         var isrcMap =
             withIsrc.Count > 0
                 ? await appleMusicClient
-                    .BatchSearchByIsrcAsync(withIsrc.ConvertAll(t => t.Isrc!), storefront, ct)
+                    .BatchSearchByIsrcAsync(
+                        withIsrc.SelectMany(GetCandidateIsrcs).Distinct().ToList(),
+                        storefront,
+                        ct
+                    )
                     .ConfigureAwait(false)
                 : [];
 
         foreach (var track in withIsrc)
         {
-            if (isrcMap.TryGetValue(track.Isrc!, out var appleTrack))
+            var match = FindBestIsrcMatch(track, isrcMap);
+            if (match is not null)
             {
-                matched.Add(new MatchResult.Matched(track, appleTrack, MatchMethod.Isrc, 1.0));
+                matched.Add(match);
             }
             else
             {
@@ -83,6 +88,56 @@ internal sealed class PlaylistTransferService(
         }
 
         return (matched, unmatched);
+    }
+
+    private static IReadOnlyList<string> GetCandidateIsrcs(TrackMetadata track)
+    {
+        if (track.IsrcCandidates.Count > 0)
+        {
+            return track.IsrcCandidates;
+        }
+
+        return string.IsNullOrWhiteSpace(track.Isrc) ? [] : [track.Isrc];
+    }
+
+    private static MatchResult.Matched? FindBestIsrcMatch(
+        TrackMetadata track,
+        Dictionary<string, AppleMusicTrack> isrcMap
+    )
+    {
+        MatchResult.Matched? bestMatch = null;
+
+        foreach (var isrc in GetCandidateIsrcs(track))
+        {
+            if (!isrcMap.TryGetValue(isrc, out var appleTrack))
+            {
+                continue;
+            }
+
+            var resolvedTrack = track with { Isrc = isrc };
+            var score = TrackMatcher.CalculateSimilarity(
+                resolvedTrack,
+                appleTrack,
+                allowNamedVersionMismatch: true
+            );
+
+            if (score < TrackMatcher.AcceptanceThreshold)
+            {
+                continue;
+            }
+
+            if (bestMatch is null || score > bestMatch.Confidence)
+            {
+                bestMatch = new MatchResult.Matched(
+                    resolvedTrack,
+                    appleTrack,
+                    MatchMethod.Isrc,
+                    score
+                );
+            }
+        }
+
+        return bestMatch;
     }
 
     /// <summary>

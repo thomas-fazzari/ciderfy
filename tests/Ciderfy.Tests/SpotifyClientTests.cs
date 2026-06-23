@@ -121,7 +121,13 @@ public class SpotifyClientTests
                 "data": {
                   "name": "War Pigs",
                   "uri": "spotify:track:wp456",
-                  "artists": { "items": [{ "profile": { "name": "Black Sabbath" } }] },
+                  "artists": {
+                    "items": [
+                      { "profile": { "name": "Black Sabbath" } },
+                      { "profile": { "name": "Ozzy Osbourne" } }
+                    ]
+                  },
+                  "albumOfTrack": { "name": "Paranoid" },
                   "trackDuration": { "totalMilliseconds": 476000 }
                 }
               }
@@ -134,6 +140,8 @@ public class SpotifyClientTests
         Assert.NotNull(result);
         Assert.Equal("War Pigs", result.Title);
         Assert.Equal("Black Sabbath", result.Artist);
+        Assert.Equal(["Black Sabbath", "Ozzy Osbourne"], result.Artists);
+        Assert.Equal("Paranoid", result.AlbumTitle);
         Assert.Equal("wp456", result.SpotifyId);
         Assert.Equal(476000, result.DurationMs);
     }

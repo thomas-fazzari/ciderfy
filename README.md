@@ -9,125 +9,59 @@
   <img src="https://img.shields.io/badge/.NET-10.0-313244?style=flat-square&labelColor=11111B&logo=dotnet&logoColor=white" alt=".NET 10">
 </p>
 
-A .NET 10 TUI tool to transfer Spotify playlists to Apple Music without any developer accounts required
+A terminal app for transferring Spotify playlists to Apple Music without any developer accounts or API key required.
 
-## Features
+## What It Does
 
-- Interactive modern TUI app built with Spectre.Console
-- Spotify playlist import from standard URLs, embed URLs, intl URLs, and `spotify:` URIs
-- Playlist Merging: Queue multiple Spotify playlists with `/add <url>` and merge them into a single deduplicated Apple Music playlist with `/run`
-- Two-stage matching pipeline:
-  - ISRC-based matching (resolved via the Deezer catalog, since Spotify does not expose ISRCs publicly)
-  - Optional fuzzy matching for remaining tracks
-- Automatic Apple Music playlist creation and batched track insertion
-- Command hints while typing `/`, with arrow navigation and `Tab` autocomplete
-- Token caching to avoid repeated authentication (user token cached for 6 months)
+- Imports Spotify playlists from standard URLs, embed URLs, intl URLs, and `spotify:` URIs.
+- Creates Apple Music playlists and adds matched tracks in batches.
+- Merges several Spotify playlists into one deduplicated Apple Music playlist.
+- Uses ISRC matching first, with optional text matching for leftovers.
 
-## Installation
-
-### Homebrew (recommended)
+## Setup
 
 ```bash
 brew tap thomas-fazzari/ciderfy
 brew install ciderfy
 ```
 
-### Requirements
-
-- Apple Music account
-
-## How It Works
-
-Ciderfy fetches Spotify playlists without an API key via the web player's internal GraphQL endpoint with TOTP-based auth.
-
-An Apple Music developer token is automatically extracted from the web player's JS bundles, no $99/year Apple Developer account needed.
-
-ISRCs are resolved through the Deezer catalog (Spotify does not expose them publicly) by scoring candidates against the original title and artist, then used to find exact matches in the Apple Music catalog.
-
-Tracks without an ISRC match can go through an optional fuzzy pass using Jaro-Winkler similarity, penalized by duration difference to reduce false positives.
-
-### Transfer Flow
-
-```mermaid
-flowchart TD
-    A[Paste Spotify URL] --> B[Fetch Playlist]
-    B --> C[Resolve ISRCs via Deezer]
-    C --> D[Lookup ISRCs in Apple Catalog]
-    D --> E{Unmatched tracks?}
-
-    E -- No --> H[Create Apple Music Playlist]
-    E -- Yes --> F{Use fuzzy matching?}
-
-    F -- No --> H
-    F -- Yes --> G[Fuzzy match remaining tracks]
-    G --> H
-
-    H --> I[Transfer Complete]
-```
-
-## Quick Start
+Launch the app:
 
 ```bash
 ciderfy
 ```
 
-### From source
+### Authentication
 
-```bash
-dotnet restore
-dotnet run --project src/Ciderfy
-```
+Apple Music needs a user token to create playlists in your library.
 
-## First-Time Authentication
-
-In the app, run:
+Run this once before your first transfer:
 
 ```text
 /auth
 ```
 
-Then follow the prompt:
+Then:
 
-1. Open `https://music.apple.com` in your browser and sign in
-2. Open your browser's DevTools Console
+1. Open `https://music.apple.com` and sign in.
+2. Open your browser's DevTools Console.
 3. Run:
 
    ```js
    MusicKit.getInstance().musicUserToken;
    ```
 
-4. Paste the returned token into Ciderfy (cached for 6 months)
-
-The tool will automatically fetch and cache a valid Apple Music developer token if needed.
-
-## Configuration
-
-A config folder is generated on first launch and copies a default `ciderfy.ini` into it.
-
-Open the folder from the TUI with:
-
-```text
-/config
-```
-
-or:
-
-```text
-/cfg
-```
-
-The config file contains provider endpoints, Spotify web constants, timeouts, and rate-limit delays.
-Most users should keep the defaults, but the file can be edited if a third-party web endpoint or header changes before a new release is available.
+4. Paste this value into the app. It will be cached for 6 months in Ciderfy's config folder.
 
 ## Usage
 
-After startup, paste a Spotify playlist URL for a direct transfer:
+Paste one playlist:
 
 ```text
 https://open.spotify.com/playlist/<playlist-id>
 ```
 
-Or queue multiple playlists to merge them into one:
+Or queue several playlists:
 
 ```text
 /add https://open.spotify.com/playlist/<id-1>
@@ -135,26 +69,72 @@ Or queue multiple playlists to merge them into one:
 /run
 ```
 
-You can set storefront and playlist naming behavior before transfer using commands below.
+Use `/name <name>` before transfer to override the created playlist name.
+
+## Matching Pipeline
+
+The matching step has two stages:
+
+- **ISRC stage**: Spotify does not expose ISRCs here, so Deezer search provides candidate ISRCs.
+- **Apple validation**: candidate ISRCs are looked up in Apple Music, then checked against title, artist, album, duration, and version tags.
+- **Text stage**: optional fallback for unmatched tracks, using normalized music text and token-based fuzzy scoring.
+
+Text normalization accounts for:
+
+- diacritics and punctuation
+- `feat.` clauses and `&`
+- remaster, live, remix, acoustic, and instrumental tags
+- duration drift
+
+Text fallback is conservative: missed tracks are better than wrong tracks.
+
+```mermaid
+flowchart TD
+    A[Spotify playlist] --> B[Deezer ISRC candidates]
+    B --> C[Apple ISRC lookup]
+    C --> D{Unmatched tracks?}
+    D -- No --> F[Create Apple Music playlist]
+    D -- Yes --> E{Use text matching?}
+    E -- No --> F
+    E -- Yes --> G[Apple text search]
+    G --> F
+```
 
 ## Commands
 
-- `/auth` - authenticate with Apple Music
-- `/reset-auth` - clear cached tokens and re-authenticate
-- `/config` or `/cfg` - open the user config folder
-- `/status` - show tokens and storefront status
-- `/storefront <code>` or `/sf <code>` - set Apple Music storefront (default: `us`)
-- `/add <url>` - queue a Spotify playlist for merging
-- `/run` - start the transfer and merge all queued playlists
-- `/name <name>` - set name override for the next created playlist
-- `/name` - clear name override
-- `/help` or `/h` - show command help
-- `/quit`, `/exit`, or `/q` - exit
+| Command                            | Action                                   |
+| ---------------------------------- | ---------------------------------------- |
+| `/auth`                            | Authenticate with Apple Music            |
+| `/reset-auth`                      | Clear cached tokens                      |
+| `/config`, `/cfg`                  | Open config folder                       |
+| `/status`                          | Show token and storefront status         |
+| `/storefront <code>`, `/sf <code>` | Set Apple Music storefront, default `us` |
+| `/add <url>`                       | Queue Spotify playlist                   |
+| `/run`                             | Transfer queued playlists                |
+| `/name <name>`                     | Override next playlist name              |
+| `/name`                            | Clear name override                      |
+| `/help`, `/h`                      | Show help                                |
+| `/quit`, `/exit`, `/q`             | Exit                                     |
+
+## Config
+
+Run `/config` or `/cfg` to open config folder.
+
+`ciderfy.ini` contains provider endpoints, Spotify web constants, timeouts, and rate-limit delays. Defaults should work for most users; edit only when an upstream web endpoint changes before a release catches up.
+
+## Run from Source
+
+```bash
+make install
+make run
+```
 
 ## Notes and Limitations
 
-- This tool relies on third-party services and API behavior that may change
-- Apple Music developer token extraction is based on current web player assets
+- Depends on Spotify, Deezer, and Apple Music web/API behavior.
+- ISRC quality depends on Deezer catalog search results.
+- Text matching can miss tracks when catalogs disagree on title/version metadata.
+- Apple developer token extraction may break if Apple changes web player assets.
 
 ## License
 

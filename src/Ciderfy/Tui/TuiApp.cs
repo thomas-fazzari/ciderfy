@@ -12,7 +12,7 @@ namespace Ciderfy.Tui;
 internal sealed partial class TuiApp(
     TokenCache tokenCache,
     IServiceScopeFactory scopeFactory,
-    IConfigurationFolderOpener configurationFolderOpener
+    ConfigurationFolderOpener configurationFolderOpener
 ) : IDisposable
 {
     private readonly Channel<TuiMessage> _channel = Channel.CreateUnbounded<TuiMessage>();

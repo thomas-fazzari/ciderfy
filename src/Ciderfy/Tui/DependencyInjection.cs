@@ -7,7 +7,7 @@ internal static class TuiExtensions
 {
     public static IServiceCollection AddTui(this IServiceCollection services)
     {
-        services.AddSingleton<IConfigurationFolderOpener, ConfigurationFolderOpener>();
+        services.AddSingleton<ConfigurationFolderOpener>();
         services.AddTransient<TuiApp>();
         return services;
     }

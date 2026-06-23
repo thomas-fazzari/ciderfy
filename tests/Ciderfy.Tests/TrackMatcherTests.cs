@@ -6,49 +6,49 @@ namespace Ciderfy.Tests;
 
 public class TrackMatcherTests
 {
-    // StripVersionSuffix
+    // NormalizeTitle
     [Theory]
-    [InlineData("Time Of The Season - Mono", "Time Of The Season")]
-    [InlineData("Suzie Q (Remastered 2014)", "Suzie Q")]
-    [InlineData("Green Grass & High Tides - Remastered", "Green Grass & High Tides")]
-    [InlineData("Goin' Up The Country - Re-Recorded", "Goin' Up The Country")]
-    [InlineData("Born To Be Wild - Single Version", "Born To Be Wild")]
-    [InlineData("American Woman - 2024 Remaster", "American Woman")]
-    [InlineData("Hello Vietnam", "Hello Vietnam")]
-    [InlineData("Fortunate Son - Remastered 2014", "Fortunate Son")]
-    [InlineData("Paint It Black (Mono)", "Paint It Black")]
-    [InlineData("Somebody to Love [Live]", "Somebody to Love")]
-    [InlineData("White Rabbit - Stereo Version", "White Rabbit")]
-    [InlineData("Gimme Shelter (Original Mix)", "Gimme Shelter")]
-    [InlineData("Purple Haze - Deluxe Edition", "Purple Haze")]
-    [InlineData("Hey Joe - Remix", "Hey Joe")]
-    [InlineData("Light My Fire (Bonus Track)", "Light My Fire")]
-    [InlineData("All Along the Watchtower (feat. Jimi Hendrix)", "All Along the Watchtower")]
-    [InlineData("Sunshine of Your Love (ft. Eric Clapton)", "Sunshine of Your Love")]
-    [InlineData("Break On Through — Remastered", "Break On Through")]
-    [InlineData("Piece of My Heart – Live at Winterland", "Piece of My Heart")]
-    [InlineData("Already Gone", "Already Gone")]
-    public void StripVersionSuffix_StripsCorrectly(string input, string expected)
+    [InlineData("Time Of The Season - Mono", "time of the season")]
+    [InlineData("Suzie Q (Remastered 2014)", "suzie q")]
+    [InlineData("Green Grass & High Tides - Remastered", "green grass and high tides")]
+    [InlineData("Goin' Up The Country - Re-Recorded", "goin up the country")]
+    [InlineData("Born To Be Wild - Single Version", "born to be wild")]
+    [InlineData("American Woman - 2024 Remaster", "american woman")]
+    [InlineData("Hello Vietnam", "hello vietnam")]
+    [InlineData("Fortunate Son - Remastered 2014", "fortunate son")]
+    [InlineData("Paint It Black (Mono)", "paint it black")]
+    [InlineData("Somebody to Love [Live]", "somebody to love")]
+    [InlineData("White Rabbit - Stereo Version", "white rabbit")]
+    [InlineData("Gimme Shelter (Original Mix)", "gimme shelter")]
+    [InlineData("Purple Haze - Deluxe Edition", "purple haze")]
+    [InlineData("Hey Joe - Remix", "hey joe")]
+    [InlineData("Light My Fire (Bonus Track)", "light my fire")]
+    [InlineData("All Along the Watchtower (feat. Jimi Hendrix)", "all along the watchtower")]
+    [InlineData("Sunshine of Your Love (ft. Eric Clapton)", "sunshine of your love")]
+    [InlineData("Break On Through — Remastered", "break on through")]
+    [InlineData("Piece of My Heart – Live at Winterland", "piece of my heart")]
+    [InlineData("Already Gone", "already gone")]
+    public void NormalizeTitle_ExtractsPrimaryTitle(string input, string expected)
     {
-        var result = TrackMatcher.StripVersionSuffix(input);
+        var result = MusicTextNormalizer.NormalizeTitle(input).PrimaryTitle;
 
         Assert.Equal(expected, result);
     }
 
-    // NormalizeForComparison
     [Theory]
-    [InlineData("Don't Stop (Remix) [Deluxe Edition]", "DONT STOP")]
-    [InlineData("We've Gotta Get out of This Place", "WEVE GOTTA GET OUT OF THIS PLACE")]
-    [InlineData("Rock & Roll", "ROCK AND ROLL")]
-    [InlineData("HELLO WORLD", "HELLO WORLD")]
-    [InlineData("Hush – Deep Purple", "HUSH - DEEP PURPLE")]
-    [InlineData("My Girl\u2019s Name", "MY GIRLS NAME")]
-    [InlineData("Song feat. Artist", "SONG")]
-    [InlineData("Song ft. Other Artist", "SONG")]
-    [InlineData("  spaces  everywhere  ", "SPACES  EVERYWHERE")]
-    public void NormalizeForComparison_NormalizesCorrectly(string input, string expected)
+    [InlineData("Don't Stop (Remix) [Deluxe Edition]", "dont stop")]
+    [InlineData("We've Gotta Get out of This Place", "weve gotta get out of this place")]
+    [InlineData("Rock & Roll", "rock and roll")]
+    [InlineData("HELLO WORLD", "hello world")]
+    [InlineData("Hush – Deep Purple", "hush deep purple")]
+    [InlineData("My Girl\u2019s Name", "my girls name")]
+    [InlineData("Song feat. Artist", "song")]
+    [InlineData("Song ft. Other Artist", "song")]
+    [InlineData("  spaces  everywhere  ", "spaces everywhere")]
+    [InlineData("Beyoncé – Déjà Vu", "beyonce deja vu")]
+    public void NormalizeTitle_NormalizesComparableText(string input, string expected)
     {
-        var result = TrackMatcher.NormalizeForComparison(input);
+        var result = MusicTextNormalizer.NormalizeTitle(input).Comparable;
 
         Assert.Equal(expected, result);
     }
@@ -57,17 +57,17 @@ public class TrackMatcherTests
     [Theory]
     [InlineData("Suzie Q", "Suzie Q", 1.0)]
     [InlineData("Time Of The Season - Mono", "Time Of The Season", 1.0)]
-    [InlineData("War Pigs", "War Pigs / Luke's Wall", 0.9)]
+    [InlineData("War Pigs", "War Pigs / Luke's Wall", 1.0)]
     [InlineData("Fortunate Son", "Fortunate Son - Remastered 2014", 1.0)]
     [InlineData("Paint It Black", "Paint It, Black", 1.0)]
     [InlineData("Revolution 909", "Revolution 909", 1.0)]
     [InlineData("Hey Jude", "Let It Be", -1.0)] // different songs -> below 0.7
-    [InlineData("Song A / Extended Mix", "Song A / Radio Mix", 0.95)] // slash: same primary segment
-    [InlineData("Song A - Studio Mix", "Song A - Radio Mix", 0.95)] // dash: same primary segment
-    [InlineData("Song Title Extended / B-Side", "Song Title / A-Side", 0.85)] // primary contains other
+    [InlineData("Song A / Extended Mix", "Song A / Radio Mix", 1.0)] // slash: same primary segment
+    [InlineData("Song A - Studio Mix", "Song A - Radio Mix", 1.0)] // dash: same primary segment
+    [InlineData("Song Title Extended / B-Side", "Song Title / A-Side", 0.9)] // primary contains other
     public void TitleSimilarity_ReturnsExpectedScore(string a, string b, double expected)
     {
-        var result = TrackMatcher.TitleSimilarity(a, b);
+        var result = MusicSimilarity.TitleSimilarity(a, b);
 
         if (expected < 0)
         {
@@ -82,9 +82,9 @@ public class TrackMatcherTests
     [Fact]
     public void TitleSimilarity_EmptyString_ReturnsZero()
     {
-        Assert.Equal(0, TrackMatcher.TitleSimilarity("", "Something"));
-        Assert.Equal(0, TrackMatcher.TitleSimilarity("Something", ""));
-        Assert.Equal(0, TrackMatcher.TitleSimilarity("", ""));
+        Assert.Equal(0, MusicSimilarity.TitleSimilarity(string.Empty, "Something"));
+        Assert.Equal(0, MusicSimilarity.TitleSimilarity("Something", string.Empty));
+        Assert.Equal(0, MusicSimilarity.TitleSimilarity(string.Empty, string.Empty));
     }
 
     // ArtistSimilarity
@@ -100,7 +100,7 @@ public class TrackMatcherTests
     [InlineData("Daft Punk", "Queen", -1.0)] // completely different
     public void ArtistSimilarity_ReturnsExpectedScore(string a, string b, double expected)
     {
-        var result = TrackMatcher.ArtistSimilarity(a, b);
+        var result = MusicSimilarity.ArtistSimilarity(a, b);
 
         if (expected < 0)
         {
@@ -115,8 +115,8 @@ public class TrackMatcherTests
     [Fact]
     public void ArtistSimilarity_EmptyString_ReturnsZero()
     {
-        Assert.Equal(0, TrackMatcher.ArtistSimilarity("", "Daft Punk"));
-        Assert.Equal(0, TrackMatcher.ArtistSimilarity("Daft Punk", ""));
+        Assert.Equal(0, MusicSimilarity.ArtistSimilarity(string.Empty, "Daft Punk"));
+        Assert.Equal(0, MusicSimilarity.ArtistSimilarity("Daft Punk", string.Empty));
     }
 
     // CalculateSimilarity
@@ -154,6 +154,29 @@ public class TrackMatcherTests
 
         var result = TrackMatcher.CalculateSimilarity(spotify, apple);
         Assert.True(result >= 0.7, $"Expected >= 0.7 but got {result}");
+    }
+
+    [Fact]
+    public void CalculateSimilarity_NamedDetailAgainstDifferentRemix_ReturnsBelowThreshold()
+    {
+        var spotify = TrackMetadataFaker
+            .Default.Clone()
+            .RuleFor(t => t.Title, "Cruel Intentions - Heartbreak's Slow Action")
+            .RuleFor(t => t.Artist, "Simian Mobile Disco")
+            .RuleFor(t => t.AlbumTitle, "Cruel Intentions")
+            .RuleFor(t => t.DurationMs, 208_000)
+            .Generate();
+        var apple = AppleTrackFaker
+            .Default.Clone()
+            .RuleFor(t => t.Title, "Cruel Intentions (Joker Remix)")
+            .RuleFor(t => t.Artist, "Simian Mobile Disco & Beth Ditto")
+            .RuleFor(t => t.AlbumTitle, "Supa Dupa 2010")
+            .RuleFor(t => t.DurationMs, 208_000)
+            .Generate();
+
+        var result = TrackMatcher.CalculateSimilarity(spotify, apple);
+
+        Assert.True(result < 0.7, $"Expected < 0.7 but got {result}");
     }
 
     [Fact]
@@ -292,7 +315,7 @@ public class TrackMatcherTests
     [InlineData(0, 0, 1.0)] // both unknown
     public void DurationMultiplier_ReturnsExpectedValue(int spotifyMs, int appleMs, double expected)
     {
-        Assert.Equal(expected, TrackMatcher.DurationMultiplier(spotifyMs, appleMs));
+        Assert.Equal(expected, MusicSimilarity.DurationMultiplier(spotifyMs, appleMs));
     }
 
     [Fact]

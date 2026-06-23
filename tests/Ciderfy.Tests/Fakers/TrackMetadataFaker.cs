@@ -11,6 +11,7 @@ internal static class TrackMetadataFaker
         .RuleFor(t => t.SpotifyId, f => f.Random.AlphaNumeric(22))
         .RuleFor(t => t.Title, f => f.Music.Random.Words(3))
         .RuleFor(t => t.Artist, f => f.Person.FullName)
+        .RuleFor(t => t.Artists, (_, t) => [t.Artist])
         .RuleFor(t => t.DurationMs, DefaultDurationMs);
 
     public static Faker<TrackMetadata> WithDuration(int durationMs) =>

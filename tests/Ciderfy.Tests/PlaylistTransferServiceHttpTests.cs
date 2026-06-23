@@ -1,10 +1,10 @@
 using System.Net;
+using System.Net.Mime;
 using System.Text;
 using Ciderfy.Apple;
 using Ciderfy.Matching;
 using Ciderfy.Spotify;
 using Ciderfy.Tests.Fakers;
-using Ciderfy.Web;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -45,7 +45,10 @@ public class PlaylistTransferServiceHttpTests
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
     private static HttpResponseMessage Ok(string body) =>
-        new(HttpStatusCode.OK) { Content = new StringContent(body, Encoding.UTF8, MimeTypes.Json) };
+        new(HttpStatusCode.OK)
+        {
+            Content = new StringContent(body, Encoding.UTF8, MediaTypeNames.Application.Json),
+        };
 
     private PlaylistTransferService CreateSut(
         HttpClient spotifyHttp,
@@ -82,6 +85,7 @@ public class PlaylistTransferServiceHttpTests
             .Default.Clone()
             .RuleFor(t => t.Title, "Fortunate Son")
             .RuleFor(t => t.Artist, "Creedence Clearwater Revival")
+            .RuleFor(t => t.DurationMs, 140_000)
             .Generate();
 
         using var deezerHttp = FakeHttpMessageHandler.ReturningJson(DeezerWithIsrc);
@@ -95,6 +99,145 @@ public class PlaylistTransferServiceHttpTests
         Assert.Equal("am-123", matched[0].AppleTrack.Id);
         Assert.Equal(MatchMethod.Isrc, matched[0].Method);
         Assert.Equal(1.0, matched[0].Confidence);
+    }
+
+    [Fact]
+    public async Task MatchByIsrcAsync_DeezerAmbiguousCandidates_AppleValidationChoosesSingle()
+    {
+        var track = new TrackMetadata
+        {
+            SpotifyId = "spotify-cruel-intentions",
+            Title = "Cruel Intentions",
+            Artist = "Simian Mobile Disco",
+            AlbumTitle = "Cruel Intentions",
+            DurationMs = 185_000,
+        };
+
+        const string deezerJson = """
+            {
+              "data": [
+                {
+                  "isrc": "GBDNH0900091",
+                  "title": "Cruel Intentions",
+                  "title_short": "Cruel Intentions",
+                  "title_version": "",
+                  "artist": { "name": "Simian Mobile Disco" },
+                  "album": { "title": "Temporary Pleasure" },
+                  "duration": 184
+                },
+                {
+                  "isrc": "GBDNH0900097",
+                  "title": "Cruel Intentions (Single Version)",
+                  "title_short": "Cruel Intentions",
+                  "title_version": "(Single Version)",
+                  "artist": { "name": "Simian Mobile Disco" },
+                  "album": { "title": "Cruel Intentions" },
+                  "duration": 185
+                },
+                {
+                  "isrc": "GBDNH0901161",
+                  "title": "Cruel Intentions (Heartbreak's Slow Action Remix)",
+                  "title_short": "Cruel Intentions",
+                  "title_version": "(Heartbreak's Slow Action Remix)",
+                  "artist": { "name": "Simian Mobile Disco" },
+                  "album": { "title": "Cruel Intentions" },
+                  "duration": 208
+                }
+              ]
+            }
+            """;
+        const string appleJson = """
+            {
+              "data": [
+                {
+                  "id": "am-single",
+                  "attributes": {
+                    "name": "Cruel Intentions",
+                    "artistName": "Simian Mobile Disco",
+                    "albumName": "Cruel Intentions",
+                    "isrc": "GBDNH0900097",
+                    "durationInMillis": 185000
+                  }
+                }
+              ]
+            }
+            """;
+
+        using var deezerHttp = FakeHttpMessageHandler.ReturningJson(deezerJson);
+        using var amHttp = FakeHttpMessageHandler.ReturningJson(appleJson);
+
+        var sut = CreateSut(FakeHttpMessageHandler.ThrowOnCall(), amHttp, deezerHttp);
+        var (matched, unmatched) = await sut.MatchByIsrcAsync([track], "us", ct: Ct);
+
+        var match = Assert.Single(matched);
+        Assert.Empty(unmatched);
+        Assert.Equal("am-single", match.AppleTrack.Id);
+        Assert.Equal("GBDNH0900097", match.SpotifyTrack.Isrc);
+    }
+
+    [Fact]
+    public async Task MatchByIsrcAsync_NamedCruelIntentionsRemixWithoutRemixWord_MatchesDeezerRemix()
+    {
+        var track = new TrackMetadata
+        {
+            SpotifyId = "spotify-cruel-intentions-heartbreak",
+            Title = "Cruel Intentions - Heartbreak's Slow Action",
+            Artist = "Simian Mobile Disco",
+            AlbumTitle = "Cruel Intentions",
+            DurationMs = 208_000,
+        };
+
+        const string deezerJson = """
+            {
+              "data": [
+                {
+                  "isrc": "GBDNH0901161",
+                  "title": "Cruel Intentions (Heartbreak's Slow Action Remix)",
+                  "title_short": "Cruel Intentions",
+                  "title_version": "(Heartbreak's Slow Action Remix)",
+                  "artist": { "name": "Simian Mobile Disco" },
+                  "album": { "title": "Cruel Intentions" },
+                  "duration": 208
+                },
+                {
+                  "isrc": "GBDNH0900091",
+                  "title": "Cruel Intentions",
+                  "title_short": "Cruel Intentions",
+                  "title_version": "",
+                  "artist": { "name": "Simian Mobile Disco" },
+                  "album": { "title": "Temporary Pleasure" },
+                  "duration": 184
+                }
+              ]
+            }
+            """;
+        const string appleJson = """
+            {
+              "data": [
+                {
+                  "id": "am-heartbreak",
+                  "attributes": {
+                    "name": "Cruel Intentions (Heartbreak's Slow Action Remix)",
+                    "artistName": "Simian Mobile Disco",
+                    "albumName": "Cruel Intentions",
+                    "isrc": "GBDNH0901161",
+                    "durationInMillis": 208000
+                  }
+                }
+              ]
+            }
+            """;
+
+        using var deezerHttp = FakeHttpMessageHandler.ReturningJson(deezerJson);
+        using var amHttp = FakeHttpMessageHandler.ReturningJson(appleJson);
+
+        var sut = CreateSut(FakeHttpMessageHandler.ThrowOnCall(), amHttp, deezerHttp);
+        var (matched, unmatched) = await sut.MatchByIsrcAsync([track], "us", ct: Ct);
+
+        var match = Assert.Single(matched);
+        Assert.Empty(unmatched);
+        Assert.Equal("am-heartbreak", match.AppleTrack.Id);
+        Assert.Equal("GBDNH0901161", match.SpotifyTrack.Isrc);
     }
 
     [Fact]

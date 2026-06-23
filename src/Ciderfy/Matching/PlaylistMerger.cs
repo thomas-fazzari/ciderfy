@@ -23,6 +23,8 @@ internal static class PlaylistMerger
                     SpotifyId = t.SpotifyId,
                     Title = t.Title,
                     Artist = t.Artist,
+                    Artists = t.Artists,
+                    AlbumTitle = t.AlbumTitle,
                     DurationMs = t.DurationMs,
                 }),
         ];

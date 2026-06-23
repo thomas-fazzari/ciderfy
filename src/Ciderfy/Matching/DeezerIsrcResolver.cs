@@ -1,20 +1,23 @@
+using System.Globalization;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Matching;
 
 /// <summary>
-/// Resolves ISRCs for tracks by searching the Deezer catalog
+/// Resolves ISRCs for tracks by searching the Deezer catalog.
 /// </summary>
 internal sealed class DeezerIsrcResolver(
     HttpClient httpClient,
     IOptions<DeezerClientOptions> options
 ) : IDisposable
 {
-    private const int SearchResultLimit = 5;
-    private const double MinIsrcMatchScore = 0.5;
+    private const int SearchResultLimit = 20;
+    private const double MinIsrcMatchScore = 0.86;
+    private const double MinIsrcMatchMargin = 0.08;
+    private const double MinCandidateScore = 0.80;
+    private const double AlbumBonusWeight = 0.03;
 
     private readonly RateLimiter _rateLimiter = new SlidingWindowRateLimiter(
         new SlidingWindowRateLimiterOptions
@@ -28,10 +31,10 @@ internal sealed class DeezerIsrcResolver(
     );
 
     /// <summary>
-    /// Resolves ISRCs for a batch of tracks using individual Deezer searches
+    /// Resolves ISRCs for a batch of tracks using one Deezer search per track.
     /// </summary>
     /// <returns>
-    /// The input tracks with their ISRC fields populated where found
+    /// The input tracks with their ISRC fields populated where found.
     /// </returns>
     public async Task<List<TrackMetadata>> ResolveIsrcsAsync(
         IReadOnlyList<TrackMetadata> tracks,
@@ -49,9 +52,15 @@ internal sealed class DeezerIsrcResolver(
                 async (i, token) =>
                 {
                     var track = tracks[i];
-                    var isrc = await FindIsrcAsync(track.Title, track.Artist, token)
-                        .ConfigureAwait(false);
-                    results[i] = isrc is not null ? track with { Isrc = isrc } : track;
+                    var resolution = await FindIsrcsAsync(track, token).ConfigureAwait(false);
+                    results[i] =
+                        resolution.Candidates.Count > 0
+                            ? track with
+                            {
+                                Isrc = resolution.ConfidentIsrc,
+                                IsrcCandidates = resolution.Candidates,
+                            }
+                            : track;
 
                     var currentCount = Interlocked.Increment(ref completed);
                     progress?.Report((currentCount, tracks.Count));
@@ -62,50 +71,218 @@ internal sealed class DeezerIsrcResolver(
         return [.. results];
     }
 
-    private async Task<string?> FindIsrcAsync(string title, string artist, CancellationToken ct)
+    private async Task<DeezerIsrcResolution> FindIsrcsAsync(
+        TrackMetadata track,
+        CancellationToken ct
+    )
     {
-        var query = Uri.EscapeDataString($"{artist} {title}");
-        var url = $"search?q={query}&limit={SearchResultLimit}";
+        var sourceTitle = MusicTextNormalizer.NormalizeTitle(track.Title);
+        var queryTitle =
+            sourceTitle.PrimaryTitle.Length > 0 ? sourceTitle.PrimaryTitle : sourceTitle.Comparable;
+
+        var query = Uri.EscapeDataString($"{track.Artist} {queryTitle}".Trim());
+
+        var url = $"search/track?q={query}&limit={SearchResultLimit}";
 
         var json = await GetWithRateLimitAsync(url, ct).ConfigureAwait(false);
         if (json is null)
         {
+            return DeezerIsrcResolution.Empty;
+        }
+
+        var data = ParseSearchItems(json);
+        if (data.Count == 0)
+        {
+            return DeezerIsrcResolution.Empty;
+        }
+
+        var scored = data.Select(item => ScoreCandidate(track, sourceTitle, item))
+            .Where(score => score is not null)
+            .Select(score => score!.Value)
+            .GroupBy(score => score.Isrc, StringComparer.OrdinalIgnoreCase)
+            .Select(group => group.MaxBy(score => score.Score))
+            .OrderByDescending(score => score.Score)
+            .ToList();
+
+        if (scored.Count == 0)
+        {
+            return DeezerIsrcResolution.Empty;
+        }
+
+        var best = scored[0];
+        if (best.Score < MinIsrcMatchScore)
+        {
+            return DeezerIsrcResolution.Empty;
+        }
+
+        var candidates = scored
+            .Where(score => score.Score >= MinCandidateScore)
+            .Select(score => score.Isrc)
+            .ToList();
+        var confidentIsrc =
+            scored.Count == 1 || best.Score - scored[1].Score >= MinIsrcMatchMargin
+                ? best.Isrc
+                : null;
+
+        return new DeezerIsrcResolution(confidentIsrc, candidates);
+    }
+
+    private static DeezerCandidateScore? ScoreCandidate(
+        TrackMetadata track,
+        NormalizedTitle sourceTitle,
+        DeezerSearchItem item
+    )
+    {
+        if (string.IsNullOrWhiteSpace(item.Isrc))
+        {
             return null;
         }
 
-        DeezerSearchResponse? response;
+        var candidateTags = item.ExplicitLyrics ? MusicVersionTag.Explicit : MusicVersionTag.None;
+        var candidateTitle = MusicTextNormalizer.NormalizeTitle(
+            string.IsNullOrWhiteSpace(item.TitleShort) ? item.Title : item.TitleShort,
+            $"{item.Title} {item.TitleVersion}",
+            candidateTags
+        );
+        var versionMultiplier = MusicSimilarity.VersionMultiplier(
+            sourceTitle,
+            candidateTitle,
+            allowNamedVersionMismatch: true
+        );
+
+        if (
+            versionMultiplier <= 0
+            || MusicSimilarity.HasHardDurationMismatch(track.DurationMs, item.DurationMs)
+        )
+        {
+            return null;
+        }
+
+        var titleScore = MusicSimilarity.TitleSimilarity(sourceTitle, candidateTitle);
+        var artistScore = MusicSimilarity.ArtistSimilarity(track.Artist, item.ArtistName);
+        var textScore =
+            (titleScore * MatchingWeights.Title) + (artistScore * MatchingWeights.Artist);
+        var durationMultiplier = MusicSimilarity.DurationMultiplier(
+            track.DurationMs,
+            item.DurationMs
+        );
+        var albumBonus =
+            MusicSimilarity.AlbumSimilarity(track.AlbumTitle, item.AlbumTitle) * AlbumBonusWeight;
+        var score = Math.Min(
+            1.0,
+            (textScore * durationMultiplier * versionMultiplier) + albumBonus
+        );
+
+        return new DeezerCandidateScore(item.Isrc, score);
+    }
+
+    private static List<DeezerSearchItem> ParseSearchItems(string json)
+    {
         try
         {
-            response = JsonSerializer.Deserialize<DeezerSearchResponse>(json);
+            using var doc = JsonDocument.Parse(json);
+            if (
+                doc.RootElement.ValueKind != JsonValueKind.Object
+                || !doc.RootElement.TryGetProperty("data", out var data)
+                || data.ValueKind != JsonValueKind.Array
+            )
+            {
+                return [];
+            }
+
+            var items = new List<DeezerSearchItem>(data.GetArrayLength());
+            foreach (var item in data.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                items.Add(
+                    new DeezerSearchItem(
+                        Isrc: GetString(item, "isrc"),
+                        Title: GetString(item, "title"),
+                        TitleShort: GetString(item, "title_short"),
+                        TitleVersion: GetString(item, "title_version"),
+                        ArtistName: GetNestedString(item, "artist", "name"),
+                        AlbumTitle: GetNestedString(item, "album", "title"),
+                        DurationMs: GetDurationMs(item),
+                        ExplicitLyrics: GetBool(item, "explicit_lyrics")
+                    )
+                );
+            }
+
+            return items;
         }
         catch (JsonException)
         {
-            return null;
+            return [];
         }
+    }
 
-        if (response?.Data is not { Count: > 0 } data)
+    private static string? GetString(JsonElement element, string propertyName)
+    {
+        if (
+            !element.TryGetProperty(propertyName, out var property)
+            || property.ValueKind != JsonValueKind.String
+        )
         {
             return null;
         }
 
-        var (isrc, score) = data.Where(item => item?.Isrc is not null)
-            .Select(item =>
-                (
-                    item!.Isrc,
-                    Score: (
-                        MatchingWeights.Title
-                        * TrackMatcher.TitleSimilarity(title, item.Title ?? string.Empty)
-                    )
-                        + (
-                            MatchingWeights.Artist
-                            * TrackMatcher.ArtistSimilarity(artist, item.ArtistName ?? string.Empty)
-                        )
-                )
-            )
-            .DefaultIfEmpty()
-            .MaxBy(x => x.Score);
+        return property.GetString();
+    }
 
-        return score >= MinIsrcMatchScore ? isrc : null;
+    private static string? GetNestedString(
+        JsonElement element,
+        string objectName,
+        string propertyName
+    )
+    {
+        if (
+            !element.TryGetProperty(objectName, out var nested)
+            || nested.ValueKind != JsonValueKind.Object
+        )
+        {
+            return null;
+        }
+
+        return GetString(nested, propertyName);
+    }
+
+    private static int GetDurationMs(JsonElement element)
+    {
+        if (!element.TryGetProperty("duration", out var duration))
+        {
+            return 0;
+        }
+
+        return duration.ValueKind switch
+        {
+            JsonValueKind.Number when duration.TryGetInt32(out var seconds) => seconds * 1000,
+            JsonValueKind.String
+                when int.TryParse(
+                    duration.GetString(),
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out var seconds
+                ) => seconds * 1000,
+            _ => 0,
+        };
+    }
+
+    private static bool GetBool(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var property))
+        {
+            return false;
+        }
+
+        return property.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            _ => false,
+        };
     }
 
     private async Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct)
@@ -140,19 +317,25 @@ internal sealed class DeezerIsrcResolver(
         httpClient.Dispose();
         _rateLimiter.Dispose();
     }
+
+    private readonly record struct DeezerCandidateScore(string Isrc, double Score);
+
+    private readonly record struct DeezerIsrcResolution(
+        string? ConfidentIsrc,
+        IReadOnlyList<string> Candidates
+    )
+    {
+        internal static DeezerIsrcResolution Empty { get; } = new(null, []);
+    }
+
+    private sealed record DeezerSearchItem(
+        string? Isrc,
+        string? Title,
+        string? TitleShort,
+        string? TitleVersion,
+        string? ArtistName,
+        string? AlbumTitle,
+        int DurationMs,
+        bool ExplicitLyrics
+    );
 }
-
-file sealed record DeezerSearchItem(
-    [property: JsonPropertyName("isrc")] string? Isrc,
-    [property: JsonPropertyName("title")] string? Title,
-    [property: JsonPropertyName("artist")] DeezerArtist? Artist
-)
-{
-    public string? ArtistName => Artist?.Name;
-}
-
-file sealed record DeezerArtist([property: JsonPropertyName("name")] string? Name);
-
-file sealed record DeezerSearchResponse(
-    [property: JsonPropertyName("data")] IReadOnlyList<DeezerSearchItem?>? Data
-);

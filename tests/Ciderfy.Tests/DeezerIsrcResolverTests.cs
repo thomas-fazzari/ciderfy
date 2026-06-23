@@ -25,7 +25,7 @@ public class DeezerIsrcResolverTests
                 SpotifyId = "test1",
                 Title = "Around the World",
                 Artist = "Daft Punk",
-                DurationMs = 420000,
+                DurationMs = 429000,
             },
         };
 
@@ -56,14 +56,14 @@ public class DeezerIsrcResolverTests
                 SpotifyId = "test1",
                 Title = "Revolution 909",
                 Artist = "Daft Punk",
-                DurationMs = 330000,
+                DurationMs = 335000,
             },
             new()
             {
                 SpotifyId = "test2",
-                Title = "Bohemian Rhapsody",
-                Artist = "Queen",
-                DurationMs = 355000,
+                Title = "Around the World",
+                Artist = "Daft Punk",
+                DurationMs = 429000,
             },
         };
 

@@ -5,7 +5,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="F23.StringSimilarity" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Ini" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
@@ -14,6 +13,7 @@
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
     <PackageReference Include="Otp.NET" />
+    <PackageReference Include="Raffinert.FuzzySharp" />
     <PackageReference Include="Spectre.Console" />
     <PackageReference Include="System.Threading.RateLimiting" />
   </ItemGroup>

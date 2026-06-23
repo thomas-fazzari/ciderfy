@@ -3,16 +3,7 @@ using System.Diagnostics;
 
 namespace Ciderfy.Configuration;
 
-internal interface IConfigurationFolderOpener
-{
-    string ConfigDirectory { get; }
-
-    void Open();
-
-    bool IsOpenFailure(Exception exception);
-}
-
-internal sealed class ConfigurationFolderOpener : IConfigurationFolderOpener
+internal sealed class ConfigurationFolderOpener
 {
     private readonly Func<ProcessStartInfo, Process?> _startProcess;
 
@@ -67,7 +58,7 @@ internal sealed class ConfigurationFolderOpener : IConfigurationFolderOpener
         return startInfo;
     }
 
-    public bool IsOpenFailure(Exception exception) =>
+    internal static bool IsOpenFailure(Exception exception) =>
         exception
             is IOException
                 or UnauthorizedAccessException

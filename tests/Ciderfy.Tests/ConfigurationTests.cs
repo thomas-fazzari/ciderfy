@@ -174,9 +174,8 @@ public class ConfigurationTests
     )
     {
         var exception = (Exception)Activator.CreateInstance(exceptionType)!;
-        var opener = new ConfigurationFolderOpener();
 
-        var isOpenFailure = opener.IsOpenFailure(exception);
+        var isOpenFailure = ConfigurationFolderOpener.IsOpenFailure(exception);
 
         Assert.Equal(expected, isOpenFailure);
     }

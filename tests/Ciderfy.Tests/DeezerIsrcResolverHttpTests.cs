@@ -23,6 +23,29 @@ public class DeezerIsrcResolverHttpTests
     }
 
     [Fact]
+    public async Task ResolveIsrcsAsync_SearchesTrackEndpointWithLimit20()
+    {
+        HttpRequestMessage? capturedRequest = null;
+        using var client = new HttpClient(
+            new FakeHttpMessageHandler(request =>
+            {
+                capturedRequest = request;
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent("""{ "data": [] }"""),
+                };
+            })
+        );
+        using var resolver = Resolver(client);
+
+        await resolver.ResolveIsrcsAsync([_track], ct: Ct);
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal("/search/track", capturedRequest.RequestUri!.AbsolutePath);
+        Assert.Contains("limit=20", capturedRequest.RequestUri.Query, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ResolveIsrcsAsync_HttpError_ReturnsTrackWithNullIsrc()
     {
         using var client = FakeHttpMessageHandler.Returning(HttpStatusCode.InternalServerError);
@@ -169,6 +192,149 @@ public class DeezerIsrcResolverHttpTests
 
         Assert.Single(results);
         Assert.Equal("GBAYE0601498", results[0].Isrc);
+    }
+
+    [Fact]
+    public async Task ResolveIsrcsAsync_StrongVersionMismatch_ReturnsNullIsrc()
+    {
+        var track = new TrackMetadata
+        {
+            SpotifyId = "test",
+            Title = "Dracula",
+            Artist = "Tame Impala",
+            DurationMs = 205_000,
+        };
+        const string json = """
+            {
+              "data": [
+                {
+                  "isrc": "USQX92600464",
+                  "title": "Dracula (JENNIE Remix)",
+                  "title_short": "Dracula",
+                  "title_version": "(JENNIE Remix)",
+                  "artist": { "name": "Tame Impala" },
+                  "duration": 209
+                }
+              ]
+            }
+            """;
+        using var client = FakeHttpMessageHandler.ReturningJson(json);
+        using var resolver = Resolver(client);
+
+        var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
+
+        Assert.Single(results);
+        Assert.Null(results[0].Isrc);
+    }
+
+    [Fact]
+    public async Task ResolveIsrcsAsync_SourceRemix_SkipsOriginalAndReturnsRemixIsrc()
+    {
+        var track = new TrackMetadata
+        {
+            SpotifyId = "test",
+            Title = "Dracula (JENNIE Remix)",
+            Artist = "Tame Impala",
+            DurationMs = 209_000,
+        };
+        const string json = """
+            {
+              "data": [
+                {
+                  "isrc": "USQX92504223",
+                  "title": "Dracula",
+                  "title_short": "Dracula",
+                  "title_version": "",
+                  "artist": { "name": "Tame Impala" },
+                  "duration": 205
+                },
+                {
+                  "isrc": "USQX92600464",
+                  "title": "Dracula (JENNIE Remix)",
+                  "title_short": "Dracula",
+                  "title_version": "(JENNIE Remix)",
+                  "artist": { "name": "Tame Impala" },
+                  "duration": 209
+                }
+              ]
+            }
+            """;
+        using var client = FakeHttpMessageHandler.ReturningJson(json);
+        using var resolver = Resolver(client);
+
+        var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
+
+        Assert.Single(results);
+        Assert.Equal("USQX92600464", results[0].Isrc);
+    }
+
+    [Fact]
+    public async Task ResolveIsrcsAsync_HardDurationMismatch_ReturnsNullIsrc()
+    {
+        var track = new TrackMetadata
+        {
+            SpotifyId = "test",
+            Title = "Let It Be",
+            Artist = "The Beatles",
+            DurationMs = 240_000,
+        };
+        const string json = """
+            {
+              "data": [
+                {
+                  "isrc": "GBAYE0601498",
+                  "title": "Let It Be",
+                  "artist": { "name": "The Beatles" },
+                  "duration": 320
+                }
+              ]
+            }
+            """;
+        using var client = FakeHttpMessageHandler.ReturningJson(json);
+        using var resolver = Resolver(client);
+
+        var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
+
+        Assert.Single(results);
+        Assert.Null(results[0].Isrc);
+    }
+
+    [Fact]
+    public async Task ResolveIsrcsAsync_AmbiguousTopResults_ReturnsCandidatesWithoutConfidentIsrc()
+    {
+        var track = new TrackMetadata
+        {
+            SpotifyId = "test",
+            Title = "Let It Be",
+            Artist = "The Beatles",
+            DurationMs = 240_000,
+        };
+        const string json = """
+            {
+              "data": [
+                {
+                  "isrc": "GBAYE0601498",
+                  "title": "Let It Be",
+                  "artist": { "name": "The Beatles" },
+                  "duration": 240
+                },
+                {
+                  "isrc": "GBAYE0601499",
+                  "title": "Let It Be",
+                  "artist": { "name": "The Beatles" },
+                  "duration": 240
+                }
+              ]
+            }
+            """;
+        using var client = FakeHttpMessageHandler.ReturningJson(json);
+        using var resolver = Resolver(client);
+
+        var results = await resolver.ResolveIsrcsAsync([track], ct: Ct);
+
+        Assert.Single(results);
+        Assert.Null(results[0].Isrc);
+        Assert.Equal(["GBAYE0601498", "GBAYE0601499"], results[0].IsrcCandidates);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
+using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -253,9 +254,11 @@ internal sealed partial class SpotifyClient(
 
         using var request = new HttpRequestMessage(HttpMethod.Post, _options.ClientTokenEndpoint);
         request.Content = new StringContent(payload, Encoding.UTF8);
-        request.Content.Headers.ContentType = new MediaTypeHeaderValue(MimeTypes.Json);
+        request.Content.Headers.ContentType = new MediaTypeHeaderValue(
+            MediaTypeNames.Application.Json
+        );
         request.Headers.Add(HttpHeaderNames.Authority, _clientTokenAuthority);
-        request.Headers.Add(HttpHeaderNames.Accept, MimeTypes.Json);
+        request.Headers.Add(HttpHeaderNames.Accept, MediaTypeNames.Application.Json);
         request.Headers.Add(HttpHeaderNames.UserAgent, UserAgent);
 
         using var response = await httpClient.SendAsync(request, ct).ConfigureAwait(false);
@@ -306,7 +309,11 @@ internal sealed partial class SpotifyClient(
         );
 
         using var request = new HttpRequestMessage(HttpMethod.Post, _options.GraphQlEndpoint);
-        request.Content = new StringContent(serialized, Encoding.UTF8, MimeTypes.Json);
+        request.Content = new StringContent(
+            serialized,
+            Encoding.UTF8,
+            MediaTypeNames.Application.Json
+        );
         request.Headers.Add(HttpHeaderNames.Authorization, $"Bearer {authState.AccessToken}");
         request.Headers.Add(_options.ClientTokenHeader, authState.ClientToken);
         if (!string.IsNullOrWhiteSpace(authState.ClientVersion))
@@ -405,26 +412,38 @@ internal sealed partial class SpotifyClient(
             SpotifyId = ExtractIdFromUri(itemData),
             Title = title,
             Artist = ExtractFirstArtist(itemData),
+            Artists = ExtractArtists(itemData),
+            AlbumTitle = ExtractAlbumTitle(itemData),
             DurationMs = ExtractDuration(itemData),
         };
     }
 
     internal static string ExtractFirstArtist(JsonElement element)
     {
-        if (
-            TryGetArtistName(element, "artists", out var name)
-            || TryGetArtistName(element, "firstArtist", out name)
-        )
-        {
-            return name;
-        }
-
-        return string.Empty;
+        var artists = ExtractArtists(element);
+        return artists.Count > 0 ? artists[0] : string.Empty;
     }
 
-    internal static bool TryGetArtistName(JsonElement element, string propertyName, out string name)
+    internal static IReadOnlyList<string> ExtractArtists(JsonElement element)
     {
-        name = string.Empty;
+        if (
+            TryGetArtistNames(element, "artists", out var names)
+            || TryGetArtistNames(element, "firstArtist", out names)
+        )
+        {
+            return names;
+        }
+
+        return [];
+    }
+
+    internal static bool TryGetArtistNames(
+        JsonElement element,
+        string propertyName,
+        out IReadOnlyList<string> names
+    )
+    {
+        names = [];
         if (
             !element.TryGetProperty(propertyName, out var artists)
             || !artists.TryGetProperty("items", out var items)
@@ -434,16 +453,39 @@ internal sealed partial class SpotifyClient(
             return false;
         }
 
-        if (
-            !items[0].TryGetProperty("profile", out var profile)
-            || !profile.TryGetProperty("name", out var n)
-        )
+        var parsedNames = new List<string>();
+        foreach (var item in items.EnumerateArray())
         {
-            return false;
+            if (
+                !item.TryGetProperty("profile", out var profile)
+                || !profile.TryGetProperty("name", out var n)
+            )
+            {
+                continue;
+            }
+
+            var name = n.GetString();
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                parsedNames.Add(name);
+            }
         }
 
-        name = n.GetString() ?? string.Empty;
-        return name.Length > 0;
+        names = parsedNames;
+        return parsedNames.Count > 0;
+    }
+
+    internal static string? ExtractAlbumTitle(JsonElement element)
+    {
+        if (
+            element.TryGetProperty("albumOfTrack", out var album)
+            && album.TryGetProperty("name", out var name)
+        )
+        {
+            return name.GetString();
+        }
+
+        return null;
     }
 
     internal static string ExtractIdFromUri(JsonElement element) =>

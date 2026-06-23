@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Mime;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -113,9 +114,7 @@ internal sealed class AppleMusicClient(
             return tracks;
         }
 
-        tracks.AddRange(
-            data.EnumerateArray().Select(item => ParseTrack(item)).OfType<AppleMusicTrack>()
-        );
+        tracks.AddRange(data.EnumerateArray().Select(ParseTrack).OfType<AppleMusicTrack>());
 
         return tracks;
     }
@@ -243,7 +242,11 @@ internal sealed class AppleMusicClient(
             {
                 var request = new HttpRequestMessage(HttpMethod.Post, url)
                 {
-                    Content = new StringContent(jsonBody, Encoding.UTF8, MimeTypes.Json),
+                    Content = new StringContent(
+                        jsonBody,
+                        Encoding.UTF8,
+                        MediaTypeNames.Application.Json
+                    ),
                 };
                 ApplyAuthHeaders(request, authHeaders);
                 return httpClient.SendAsync(request, token);
@@ -338,6 +341,7 @@ internal sealed class AppleMusicClient(
             Id = e.Id,
             Title = e.Attributes.Name ?? string.Empty,
             Artist = e.Attributes.ArtistName ?? string.Empty,
+            AlbumTitle = e.Attributes.AlbumName,
             DurationMs = e.Attributes.DurationMs,
             Isrc = e.Attributes.Isrc,
         };
@@ -353,6 +357,7 @@ internal sealed class AppleMusicClient(
 file sealed record AppleTrackAttributes(
     [property: JsonPropertyName("name")] string? Name,
     [property: JsonPropertyName("artistName")] string? ArtistName,
+    [property: JsonPropertyName("albumName")] string? AlbumName,
     [property: JsonPropertyName("durationInMillis")] int DurationMs,
     [property: JsonPropertyName("isrc")] string? Isrc
 );
