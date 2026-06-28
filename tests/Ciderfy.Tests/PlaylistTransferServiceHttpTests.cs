@@ -3,7 +3,6 @@ using System.Net.Mime;
 using System.Text;
 using Ciderfy.Apple;
 using Ciderfy.Matching;
-using Ciderfy.Spotify;
 using Ciderfy.Tests.Fakers;
 using Microsoft.Extensions.Options;
 using Xunit;
@@ -50,21 +49,12 @@ public class PlaylistTransferServiceHttpTests
             Content = new StringContent(body, Encoding.UTF8, MediaTypeNames.Application.Json),
         };
 
-    private PlaylistTransferService CreateSut(
-        HttpClient spotifyHttp,
-        HttpClient amHttp,
-        HttpClient deezerHttp
-    )
+    private PlaylistTransferService CreateSut(HttpClient amHttp, HttpClient deezerHttp)
     {
-        deezerHttp.BaseAddress = new Uri(_fastDeezerOptions.Value.BaseUrl);
-        amHttp.BaseAddress = new Uri(_fastAmOptions.Value.BaseUrl);
+        deezerHttp.BaseAddress = new Uri(DeezerIsrcResolver.BaseUrl);
+        amHttp.BaseAddress = new Uri(AppleMusicClient.BaseUrl);
         var amClient = new AppleMusicClient(amHttp, _fastAmOptions, _tokenCache);
         return new PlaylistTransferService(
-            new SpotifyClient(
-                spotifyHttp,
-                new CookieContainer(),
-                Options.Create(new SpotifyClientOptions())
-            ),
             amClient,
             new TrackMatcher(amClient),
             new DeezerIsrcResolver(deezerHttp, _fastDeezerOptions)
@@ -72,11 +62,7 @@ public class PlaylistTransferServiceHttpTests
     }
 
     private PlaylistTransferService SutWithAmOnly(HttpClient amHttp) =>
-        CreateSut(
-            FakeHttpMessageHandler.ThrowOnCall(),
-            amHttp,
-            FakeHttpMessageHandler.ThrowOnCall()
-        );
+        CreateSut(amHttp, FakeHttpMessageHandler.ThrowOnCall());
 
     [Fact]
     public async Task MatchByIsrcAsync_AllTracksHaveIsrc_ReturnsMatchedResults()
@@ -91,7 +77,7 @@ public class PlaylistTransferServiceHttpTests
         using var deezerHttp = FakeHttpMessageHandler.ReturningJson(DeezerWithIsrc);
         using var amHttp = FakeHttpMessageHandler.ReturningJson(AmIsrcTrack);
 
-        var sut = CreateSut(FakeHttpMessageHandler.ThrowOnCall(), amHttp, deezerHttp);
+        var sut = CreateSut(amHttp, deezerHttp);
         var (matched, unmatched) = await sut.MatchByIsrcAsync([track], "us", ct: Ct);
 
         Assert.Single(matched);
@@ -166,7 +152,7 @@ public class PlaylistTransferServiceHttpTests
         using var deezerHttp = FakeHttpMessageHandler.ReturningJson(deezerJson);
         using var amHttp = FakeHttpMessageHandler.ReturningJson(appleJson);
 
-        var sut = CreateSut(FakeHttpMessageHandler.ThrowOnCall(), amHttp, deezerHttp);
+        var sut = CreateSut(amHttp, deezerHttp);
         var (matched, unmatched) = await sut.MatchByIsrcAsync([track], "us", ct: Ct);
 
         var match = Assert.Single(matched);
@@ -231,7 +217,7 @@ public class PlaylistTransferServiceHttpTests
         using var deezerHttp = FakeHttpMessageHandler.ReturningJson(deezerJson);
         using var amHttp = FakeHttpMessageHandler.ReturningJson(appleJson);
 
-        var sut = CreateSut(FakeHttpMessageHandler.ThrowOnCall(), amHttp, deezerHttp);
+        var sut = CreateSut(amHttp, deezerHttp);
         var (matched, unmatched) = await sut.MatchByIsrcAsync([track], "us", ct: Ct);
 
         var match = Assert.Single(matched);
@@ -246,7 +232,7 @@ public class PlaylistTransferServiceHttpTests
         using var deezerHttp = FakeHttpMessageHandler.ReturningJson(DeezerNoIsrc);
         using var amHttp = FakeHttpMessageHandler.ThrowOnCall();
 
-        var sut = CreateSut(FakeHttpMessageHandler.ThrowOnCall(), amHttp, deezerHttp);
+        var sut = CreateSut(amHttp, deezerHttp);
         var (matched, unmatched) = await sut.MatchByIsrcAsync(
             [TrackMetadataFaker.Default.Generate()],
             "us",

@@ -16,11 +16,14 @@ internal static class MatchingExtensions
     {
         services.AddTransient<TrackMatcher>();
         services.AddTransient<PlaylistTransferService>();
-        services.AddSingleton<IValidateOptions<DeezerClientOptions>, ValidateDeezerClientOptions>();
 
         services
             .AddOptions<DeezerClientOptions>()
             .Bind(configuration.GetSection(DeezerClientOptions.SectionName))
+            .Validate(
+                o => o is { TimeoutSeconds: > 0, RateLimitDelayMs: >= 0 },
+                "Deezer timing options must be positive."
+            )
             .ValidateOnStart();
 
         services
@@ -28,7 +31,7 @@ internal static class MatchingExtensions
                 (sp, client) =>
                 {
                     var options = sp.GetRequiredService<IOptions<DeezerClientOptions>>().Value;
-                    client.BaseAddress = new Uri(options.BaseUrl);
+                    client.BaseAddress = new Uri(DeezerIsrcResolver.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
                     HttpClientDefaults.ConfigureDeezerClient(client);
                 }

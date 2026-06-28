@@ -18,7 +18,7 @@ public class DeezerIsrcResolverHttpTests
 
     private static DeezerIsrcResolver Resolver(HttpClient http)
     {
-        http.BaseAddress = new Uri(_fastOptions.Value.BaseUrl);
+        http.BaseAddress = new Uri(DeezerIsrcResolver.BaseUrl);
         return new DeezerIsrcResolver(http, _fastOptions);
     }
 

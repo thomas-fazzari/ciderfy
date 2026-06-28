@@ -17,13 +17,12 @@ public class ConfigurationTests
                 Path.Combine(tempDir, "ciderfy.ini"),
                 """
                 [Spotify]
-                PlaylistQueryHash=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-                TotpVersion=42
+                TimeoutSeconds=42
                 """
             );
             var configuration = new ConfigurationManager();
             configuration.AddInMemoryCollection(
-                new Dictionary<string, string?> { ["Spotify:TotpVersion"] = "99" }
+                new Dictionary<string, string?> { ["Spotify:TimeoutSeconds"] = "99" }
             );
 
             configuration.AddCiderfyConfiguration(
@@ -31,11 +30,7 @@ public class ConfigurationTests
                 Path.Combine(AppContext.BaseDirectory, "ciderfy.ini")
             );
 
-            Assert.Equal(
-                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-                configuration["Spotify:PlaylistQueryHash"]
-            );
-            Assert.Equal("42", configuration["Spotify:TotpVersion"]);
+            Assert.Equal("42", configuration["Spotify:TimeoutSeconds"]);
         }
         finally
         {
@@ -51,7 +46,10 @@ public class ConfigurationTests
         var templatePath = Path.Combine(rootDir, "template.ini");
         try
         {
-            File.WriteAllText(templatePath, "[Spotify]" + Environment.NewLine + "TotpVersion=42");
+            File.WriteAllText(
+                templatePath,
+                "[Spotify]" + Environment.NewLine + "TimeoutSeconds=42"
+            );
             var configuration = new ConfigurationManager();
 
             configuration.AddCiderfyConfiguration(tempDir, templatePath);
@@ -70,7 +68,7 @@ public class ConfigurationTests
         var rootDir = CreateTempDirectory();
         var configDir = Path.Combine(rootDir, "config");
         var templatePath = Path.Combine(rootDir, "template.ini");
-        const string template = "[Spotify]\nTotpVersion=42";
+        const string template = "[Spotify]\nTimeoutSeconds=42";
         try
         {
             File.WriteAllText(templatePath, template);
@@ -81,7 +79,7 @@ public class ConfigurationTests
             var configPath = Path.Combine(configDir, "ciderfy.ini");
             Assert.True(File.Exists(configPath));
             Assert.Equal(template, File.ReadAllText(configPath));
-            Assert.Equal("42", configuration["Spotify:TotpVersion"]);
+            Assert.Equal("42", configuration["Spotify:TimeoutSeconds"]);
         }
         finally
         {

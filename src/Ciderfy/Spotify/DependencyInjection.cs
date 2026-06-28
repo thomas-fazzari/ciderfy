@@ -13,14 +13,10 @@ internal static class SpotifyExtensions
         IConfiguration configuration
     )
     {
-        services.AddSingleton<
-            IValidateOptions<SpotifyClientOptions>,
-            ValidateSpotifyClientOptions
-        >();
-
         services
             .AddOptions<SpotifyClientOptions>()
             .Bind(configuration.GetSection(SpotifyClientOptions.SectionName))
+            .Validate(o => o.TimeoutSeconds > 0, "Spotify timeout must be positive.")
             .ValidateOnStart();
 
         services.AddSingleton<CookieContainer>();

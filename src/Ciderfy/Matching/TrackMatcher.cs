@@ -38,9 +38,7 @@ internal sealed class TrackMatcher(AppleMusicClient appleMusicClient)
 
         queries.Add(cleanTitle);
 
-        var seen = new HashSet<string>(queries.Count, StringComparer.Ordinal);
-
-        foreach (var query in queries.Where(seen.Add))
+        foreach (var query in queries.Distinct(StringComparer.Ordinal))
         {
             var match = await TryTextMatchAsync(spotifyTrack, query, storefront, ct)
                 .ConfigureAwait(false);
@@ -82,19 +80,13 @@ internal sealed class TrackMatcher(AppleMusicClient appleMusicClient)
 
         var titleScore = MusicSimilarity.TitleSimilarity(spotifyTitle, appleTitle);
         var artistScore = MusicSimilarity.ArtistSimilarity(spotify.Artist, apple.Artist);
-        var textScore =
-            (titleScore * MatchingWeights.Title) + (artistScore * MatchingWeights.Artist);
 
-        var albumBonus =
-            MusicSimilarity.AlbumSimilarity(spotify.AlbumTitle, apple.AlbumTitle) * 0.03;
-
-        return Math.Min(
-            1.0,
-            (
-                textScore
-                * MusicSimilarity.DurationMultiplier(spotify.DurationMs, apple.DurationMs)
-                * versionMultiplier
-            ) + albumBonus
+        return MusicSimilarity.Score(
+            titleScore,
+            artistScore,
+            MusicSimilarity.AlbumSimilarity(spotify.AlbumTitle, apple.AlbumTitle),
+            MusicSimilarity.DurationMultiplier(spotify.DurationMs, apple.DurationMs),
+            versionMultiplier
         );
     }
 

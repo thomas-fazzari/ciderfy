@@ -72,11 +72,13 @@ public class PlaylistMergerTests
     public void ResolveName_MultiplePlaylistsNoOverride_ReturnsMergedWithDate()
     {
         var playlists = PlaylistFaker.Default.Generate(2);
-        var today = new DateOnly(2026, 2, 25);
 
-        var name = PlaylistMerger.ResolveName(playlists, null, today);
+        var name = PlaylistMerger.ResolveName(playlists, null);
 
-        Assert.Equal("Merged Playlist - 2026-02-25", name);
+        Assert.Equal(
+            $"Merged Playlist - {DateOnly.FromDateTime(DateTime.UtcNow):yyyy-MM-dd}",
+            name
+        );
     }
 
     [Theory]

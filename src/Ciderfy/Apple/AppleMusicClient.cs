@@ -28,6 +28,16 @@ internal sealed class AppleMusicClient(
     TokenCache tokenCache
 ) : IDisposable
 {
+    internal static readonly string BaseUrl = new UriBuilder(
+        Uri.UriSchemeHttps,
+        "api.music.apple.com"
+    )
+    {
+        Path = "v1/",
+    }
+        .Uri
+        .AbsoluteUri;
+
     private const string MusicUserTokenHeader = "Music-User-Token";
 
     private readonly RateLimiter _rateLimiter = new SlidingWindowRateLimiter(

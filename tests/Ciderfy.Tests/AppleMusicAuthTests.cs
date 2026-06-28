@@ -1,6 +1,5 @@
 using Ciderfy.Apple;
 using Ciderfy.Tests.Fakers;
-using Microsoft.Extensions.Options;
 using Xunit;
 
 namespace Ciderfy.Tests;
@@ -10,7 +9,6 @@ public class AppleMusicAuthTests
     private const string ValidAlg = "ES256";
     private const string TestKid = "ABCD1234";
     private const string TestIssuer = "TEAMID";
-    private const string BaseUrl = "https://music.test";
 
     // IsAppleMusicJwt
     [Fact]
@@ -222,8 +220,7 @@ public class AppleMusicAuthTests
         Assert.Contains("Skipped 1 failed bundle(s).", error.Message, StringComparison.Ordinal);
     }
 
-    private static AppleMusicAuth CreateAuth(HttpClient http, TokenCache cache) =>
-        new(cache, http, Options.Create(new AppleMusicAuthOptions { BaseUrl = BaseUrl }));
+    private static AppleMusicAuth CreateAuth(HttpClient http, TokenCache cache) => new(cache, http);
 
     private static HttpResponseMessage TextResponse(string text) =>
         new(System.Net.HttpStatusCode.OK) { Content = new StringContent(text) };

@@ -15,23 +15,20 @@ internal static class AppleExtensions
     )
     {
         services.AddSingleton(TokenCache.Load());
-        services.AddSingleton<
-            IValidateOptions<AppleMusicClientOptions>,
-            ValidateAppleMusicClientOptions
-        >();
-        services.AddSingleton<
-            IValidateOptions<AppleMusicAuthOptions>,
-            ValidateAppleMusicAuthOptions
-        >();
 
         services
             .AddOptions<AppleMusicClientOptions>()
             .Bind(configuration.GetSection(AppleMusicClientOptions.SectionName))
+            .Validate(
+                o => o is { TimeoutSeconds: > 0, MinDelayBetweenCallsMs: >= 0 },
+                "Apple Music client timing options must be positive."
+            )
             .ValidateOnStart();
 
         services
             .AddOptions<AppleMusicAuthOptions>()
             .Bind(configuration.GetSection(AppleMusicAuthOptions.SectionName))
+            .Validate(o => o.TimeoutSeconds > 0, "Apple Music auth timeout must be positive.")
             .ValidateOnStart();
 
         services
@@ -39,14 +36,11 @@ internal static class AppleExtensions
                 (sp, client) =>
                 {
                     var options = sp.GetRequiredService<IOptions<AppleMusicClientOptions>>().Value;
-                    var authOptions = sp.GetRequiredService<
-                        IOptions<AppleMusicAuthOptions>
-                    >().Value;
-                    client.BaseAddress = new Uri(options.BaseUrl);
+                    client.BaseAddress = new Uri(AppleMusicClient.BaseUrl);
                     client.Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
                     HttpClientDefaults.ConfigureAppleMusicClient(
                         client,
-                        new Uri(authOptions.BaseUrl).GetLeftPart(UriPartial.Authority)
+                        new Uri(AppleMusicAuth.BaseUrl).GetLeftPart(UriPartial.Authority)
                     );
                 }
             )

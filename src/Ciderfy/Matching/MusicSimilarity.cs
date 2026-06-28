@@ -5,6 +5,9 @@ namespace Ciderfy.Matching;
 internal static class MusicSimilarity
 {
     private const double SoftVersionMismatchPenalty = 0.96;
+    private const double TitleWeight = 0.6;
+    private const double ArtistWeight = 0.4;
+    private const double AlbumBonusWeight = 0.03;
 
     private const MusicVersionTag StrongVersionTags =
         MusicVersionTag.Live
@@ -151,6 +154,22 @@ internal static class MusicSimilarity
 
         return diffMs > 20_000 && relativeDiff > 0.12;
     }
+
+    internal static double Score(
+        double titleScore,
+        double artistScore,
+        double albumScore,
+        double durationMultiplier,
+        double versionMultiplier
+    ) =>
+        Math.Min(
+            1.0,
+            (
+                ((titleScore * TitleWeight) + (artistScore * ArtistWeight))
+                * durationMultiplier
+                * versionMultiplier
+            ) + (albumScore * AlbumBonusWeight)
+        );
 
     private static double MaxRatio(params int[] scores) => scores.Max() / 100.0;
 

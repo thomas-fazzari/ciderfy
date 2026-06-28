@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using Ciderfy.Apple;
 using Ciderfy.Configuration;
 using Ciderfy.Matching;
+using Ciderfy.Spotify;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Ciderfy.Tui;
@@ -178,7 +179,7 @@ internal sealed class TuiEffectRunner(
                 async (services, token) =>
                 {
                     var auth = services.GetRequiredService<AppleMusicAuth>();
-                    var transferService = services.GetRequiredService<PlaylistTransferService>();
+                    var spotifyClient = services.GetRequiredService<SpotifyClient>();
 
                     if (!tokenCache.HasValidDeveloperToken)
                     {
@@ -199,7 +200,7 @@ internal sealed class TuiEffectRunner(
                     }
 
                     var fetchTasks = playlistIds.Select(id =>
-                        transferService.FetchSpotifyPlaylistAsync(id, token)
+                        spotifyClient.GetPlaylistAsync(id, token)
                     );
                     var playlists = await Task.WhenAll(fetchTasks).ConfigureAwait(false);
                     messages.TryWrite(new PlaylistFetchedMsg(transferId, [.. playlists]));

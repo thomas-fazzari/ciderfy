@@ -2,7 +2,6 @@ using System.Buffers.Text;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
-using Microsoft.Extensions.Options;
 
 namespace Ciderfy.Apple;
 
@@ -12,13 +11,13 @@ namespace Ciderfy.Apple;
 /// <remarks>
 /// Token is cached in <see cref="TokenCache"/> and reused until it expires
 /// </remarks>
-internal sealed partial class AppleMusicAuth(
-    TokenCache tokenCache,
-    HttpClient httpClient,
-    IOptions<AppleMusicAuthOptions> options
-) : IDisposable
+internal sealed partial class AppleMusicAuth(TokenCache tokenCache, HttpClient httpClient)
+    : IDisposable
 {
-    private readonly AppleMusicAuthOptions _options = options.Value;
+    internal static readonly string BaseUrl = new UriBuilder(
+        Uri.UriSchemeHttps,
+        "music.apple.com"
+    ).Uri.GetLeftPart(UriPartial.Authority);
 
     /// <returns>
     /// A valid developer token, using the cache if available or scraping it from the web player
@@ -51,7 +50,7 @@ internal sealed partial class AppleMusicAuth(
     private async Task<string> ExtractDeveloperTokenFromWebAsync(CancellationToken ct)
     {
         var html = await httpClient
-            .GetStringAsync(new Uri($"{_options.BaseUrl}/browse"), ct)
+            .GetStringAsync(new Uri($"{BaseUrl}/browse"), ct)
             .ConfigureAwait(false);
 
         var scriptUrls = ScriptSrcRegex()
@@ -73,7 +72,7 @@ internal sealed partial class AppleMusicAuth(
 
             var fullUrl = scriptUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
                 ? scriptUrl
-                : _options.BaseUrl + scriptUrl;
+                : BaseUrl + scriptUrl;
 
             try
             {

@@ -18,9 +18,9 @@ internal static class TestHttpClients
         var client = new HttpClient(HttpClientDefaults.CreateDecompressionHandler())
         {
             Timeout = TimeSpan.FromSeconds(30),
-            BaseAddress = new Uri(new AppleMusicClientOptions().BaseUrl),
+            BaseAddress = new Uri(AppleMusicClient.BaseUrl),
         };
-        HttpClientDefaults.ConfigureAppleMusicClient(client, new AppleMusicAuthOptions().BaseUrl);
+        HttpClientDefaults.ConfigureAppleMusicClient(client, AppleMusicAuth.BaseUrl);
         return client;
     }
 
@@ -29,7 +29,7 @@ internal static class TestHttpClients
         var client = new HttpClient(HttpClientDefaults.CreateDecompressionHandler())
         {
             Timeout = TimeSpan.FromSeconds(15),
-            BaseAddress = new Uri(new DeezerClientOptions().BaseUrl),
+            BaseAddress = new Uri(DeezerIsrcResolver.BaseUrl),
         };
         HttpClientDefaults.ConfigureDeezerClient(client);
         return client;

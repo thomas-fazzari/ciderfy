@@ -120,7 +120,7 @@ flowchart TD
 
 Run `/config` or `/cfg` to open config folder.
 
-`ciderfy.ini` contains provider endpoints, Spotify web constants, timeouts, and rate-limit delays. Defaults should work for most users; edit only when an upstream web endpoint changes before a release catches up.
+`ciderfy.ini` contains timeouts and rate-limit delays for each provider. Defaults should work for most users, edit only when timing or rate-limit adjustments are needed.
 
 ## Run from Source
 

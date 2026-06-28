@@ -39,8 +39,7 @@ internal static class PlaylistMerger
     /// </remarks>
     internal static string ResolveName(
         IReadOnlyList<SpotifyPlaylist> playlists,
-        string? userOverrideName,
-        DateOnly? today = null
+        string? userOverrideName
     )
     {
         if (!string.IsNullOrWhiteSpace(userOverrideName))
@@ -53,7 +52,7 @@ internal static class PlaylistMerger
             return playlists[0].Name;
         }
 
-        var date = today ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var date = DateOnly.FromDateTime(DateTime.UtcNow);
         return $"Merged Playlist - {date:yyyy-MM-dd}";
     }
 }

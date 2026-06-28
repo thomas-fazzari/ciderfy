@@ -1,5 +1,4 @@
 using Ciderfy.Apple;
-using Ciderfy.Spotify;
 
 namespace Ciderfy.Matching;
 
@@ -7,23 +6,11 @@ namespace Ciderfy.Matching;
 /// Manages the playlist transfers by handling track fetching/matching and playlist creation
 /// </summary>
 internal sealed class PlaylistTransferService(
-    SpotifyClient spotifyClient,
     AppleMusicClient appleMusicClient,
     TrackMatcher matcher,
     DeezerIsrcResolver deezerIsrcResolver
 )
 {
-    /// <summary>
-    /// Fetches a Spotify playlist by ID
-    /// </summary>
-    /// <returns>
-    /// The playlist name and tracks
-    /// </returns>
-    public Task<SpotifyPlaylist> FetchSpotifyPlaylistAsync(
-        string playlistId,
-        CancellationToken ct = default
-    ) => spotifyClient.GetPlaylistAsync(playlistId, ct);
-
     /// <summary>
     /// Resolves ISRCs via Deezer, then batch-matches against Apple Music
     /// </summary>

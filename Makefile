@@ -38,13 +38,6 @@ lint:
 	dotnet tool run slopwatch analyze --fail-on warning
 	dotnet build $(SOLUTION) --no-restore --configuration $(CONFIGURATION)
 
-.PHONY: check
-check: lint
-
-.PHONY: fix
-fix:
-	dotnet tool run csharpier format .
-
 .PHONY: outdated
 outdated:
 	dotnet tool run dotnet-outdated

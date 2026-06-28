@@ -1,5 +1,5 @@
-using System.Globalization;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.Options;
 
@@ -13,11 +13,17 @@ internal sealed class DeezerIsrcResolver(
     IOptions<DeezerClientOptions> options
 ) : IDisposable
 {
+    internal static readonly string BaseUrl = new UriBuilder(Uri.UriSchemeHttps, "api.deezer.com")
+    {
+        Path = "/",
+    }
+        .Uri
+        .AbsoluteUri;
+
     private const int SearchResultLimit = 20;
     private const double MinIsrcMatchScore = 0.86;
     private const double MinIsrcMatchMargin = 0.08;
     private const double MinCandidateScore = 0.80;
-    private const double AlbumBonusWeight = 0.03;
 
     private readonly RateLimiter _rateLimiter = new SlidingWindowRateLimiter(
         new SlidingWindowRateLimiterOptions
@@ -160,17 +166,12 @@ internal sealed class DeezerIsrcResolver(
 
         var titleScore = MusicSimilarity.TitleSimilarity(sourceTitle, candidateTitle);
         var artistScore = MusicSimilarity.ArtistSimilarity(track.Artist, item.ArtistName);
-        var textScore =
-            (titleScore * MatchingWeights.Title) + (artistScore * MatchingWeights.Artist);
-        var durationMultiplier = MusicSimilarity.DurationMultiplier(
-            track.DurationMs,
-            item.DurationMs
-        );
-        var albumBonus =
-            MusicSimilarity.AlbumSimilarity(track.AlbumTitle, item.AlbumTitle) * AlbumBonusWeight;
-        var score = Math.Min(
-            1.0,
-            (textScore * durationMultiplier * versionMultiplier) + albumBonus
+        var score = MusicSimilarity.Score(
+            titleScore,
+            artistScore,
+            MusicSimilarity.AlbumSimilarity(track.AlbumTitle, item.AlbumTitle),
+            MusicSimilarity.DurationMultiplier(track.DurationMs, item.DurationMs),
+            versionMultiplier
         );
 
         return new DeezerCandidateScore(item.Isrc, score);
@@ -180,109 +181,12 @@ internal sealed class DeezerIsrcResolver(
     {
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            if (
-                doc.RootElement.ValueKind != JsonValueKind.Object
-                || !doc.RootElement.TryGetProperty("data", out var data)
-                || data.ValueKind != JsonValueKind.Array
-            )
-            {
-                return [];
-            }
-
-            var items = new List<DeezerSearchItem>(data.GetArrayLength());
-            foreach (var item in data.EnumerateArray())
-            {
-                if (item.ValueKind != JsonValueKind.Object)
-                {
-                    continue;
-                }
-
-                items.Add(
-                    new DeezerSearchItem(
-                        Isrc: GetString(item, "isrc"),
-                        Title: GetString(item, "title"),
-                        TitleShort: GetString(item, "title_short"),
-                        TitleVersion: GetString(item, "title_version"),
-                        ArtistName: GetNestedString(item, "artist", "name"),
-                        AlbumTitle: GetNestedString(item, "album", "title"),
-                        DurationMs: GetDurationMs(item),
-                        ExplicitLyrics: GetBool(item, "explicit_lyrics")
-                    )
-                );
-            }
-
-            return items;
+            return JsonSerializer.Deserialize<DeezerSearchResponse>(json)?.Data ?? [];
         }
         catch (JsonException)
         {
             return [];
         }
-    }
-
-    private static string? GetString(JsonElement element, string propertyName)
-    {
-        if (
-            !element.TryGetProperty(propertyName, out var property)
-            || property.ValueKind != JsonValueKind.String
-        )
-        {
-            return null;
-        }
-
-        return property.GetString();
-    }
-
-    private static string? GetNestedString(
-        JsonElement element,
-        string objectName,
-        string propertyName
-    )
-    {
-        if (
-            !element.TryGetProperty(objectName, out var nested)
-            || nested.ValueKind != JsonValueKind.Object
-        )
-        {
-            return null;
-        }
-
-        return GetString(nested, propertyName);
-    }
-
-    private static int GetDurationMs(JsonElement element)
-    {
-        if (!element.TryGetProperty("duration", out var duration))
-        {
-            return 0;
-        }
-
-        return duration.ValueKind switch
-        {
-            JsonValueKind.Number when duration.TryGetInt32(out var seconds) => seconds * 1000,
-            JsonValueKind.String
-                when int.TryParse(
-                    duration.GetString(),
-                    NumberStyles.Integer,
-                    CultureInfo.InvariantCulture,
-                    out var seconds
-                ) => seconds * 1000,
-            _ => 0,
-        };
-    }
-
-    private static bool GetBool(JsonElement element, string propertyName)
-    {
-        if (!element.TryGetProperty(propertyName, out var property))
-        {
-            return false;
-        }
-
-        return property.ValueKind switch
-        {
-            JsonValueKind.True => true,
-            _ => false,
-        };
     }
 
     private async Task<string?> GetWithRateLimitAsync(string url, CancellationToken ct)
@@ -328,14 +232,30 @@ internal sealed class DeezerIsrcResolver(
         internal static DeezerIsrcResolution Empty { get; } = new(null, []);
     }
 
+    private sealed record DeezerSearchResponse(
+        [property: JsonPropertyName("data")] List<DeezerSearchItem>? Data
+    );
+
     private sealed record DeezerSearchItem(
-        string? Isrc,
-        string? Title,
-        string? TitleShort,
-        string? TitleVersion,
-        string? ArtistName,
-        string? AlbumTitle,
-        int DurationMs,
-        bool ExplicitLyrics
+        [property: JsonPropertyName("isrc")] string? Isrc,
+        [property: JsonPropertyName("title")] string? Title,
+        [property: JsonPropertyName("title_short")] string? TitleShort,
+        [property: JsonPropertyName("title_version")] string? TitleVersion,
+        [property: JsonPropertyName("artist")] DeezerNamedValue? Artist,
+        [property: JsonPropertyName("album")] DeezerNamedValue? Album,
+        [property: JsonPropertyName("duration")]
+        [property: JsonNumberHandling(JsonNumberHandling.AllowReadingFromString)]
+            int DurationSeconds,
+        [property: JsonPropertyName("explicit_lyrics")] bool ExplicitLyrics
+    )
+    {
+        internal string? ArtistName => Artist?.Name;
+        internal string? AlbumTitle => Album?.Title ?? Album?.Name;
+        internal int DurationMs => DurationSeconds * 1000;
+    }
+
+    private sealed record DeezerNamedValue(
+        [property: JsonPropertyName("name")] string? Name,
+        [property: JsonPropertyName("title")] string? Title
     );
 }

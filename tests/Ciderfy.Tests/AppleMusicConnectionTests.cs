@@ -14,11 +14,7 @@ public class AppleMusicConnectionTests
     {
         // Arrange
         using var authClient = TestHttpClients.CreateAppleMusicAuthClient();
-        var auth = new AppleMusicAuth(
-            _tokenCache,
-            authClient,
-            Options.Create(new AppleMusicAuthOptions())
-        );
+        var auth = new AppleMusicAuth(_tokenCache, authClient);
         var ct = TestContext.Current.CancellationToken;
 
         // Act
@@ -35,11 +31,7 @@ public class AppleMusicConnectionTests
     {
         // Arrange
         using var authClient = TestHttpClients.CreateAppleMusicAuthClient();
-        var auth = new AppleMusicAuth(
-            _tokenCache,
-            authClient,
-            Options.Create(new AppleMusicAuthOptions())
-        );
+        var auth = new AppleMusicAuth(_tokenCache, authClient);
         var ct = TestContext.Current.CancellationToken;
 
         // Act
@@ -56,11 +48,7 @@ public class AppleMusicConnectionTests
     {
         // Arrange
         using var authClient = TestHttpClients.CreateAppleMusicAuthClient();
-        var auth = new AppleMusicAuth(
-            _tokenCache,
-            authClient,
-            Options.Create(new AppleMusicAuthOptions())
-        );
+        var auth = new AppleMusicAuth(_tokenCache, authClient);
         using var appleMusicHttpClient = TestHttpClients.CreateAppleMusicClient();
         using var client = new AppleMusicClient(
             appleMusicHttpClient,

@@ -23,7 +23,7 @@ public class AppleMusicClientHttpTests
 
     private AppleMusicClient Client(HttpClient http)
     {
-        http.BaseAddress = new Uri(_fastOptions.Value.BaseUrl);
+        http.BaseAddress = new Uri(AppleMusicClient.BaseUrl);
         return new(http, _fastOptions, _tokenCache);
     }
 

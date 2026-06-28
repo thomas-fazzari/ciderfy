@@ -22,7 +22,7 @@ public class TrackMatcherHttpTests
 
     private TrackMatcher Matcher(HttpClient http)
     {
-        http.BaseAddress = new Uri(_fastOptions.Value.BaseUrl);
+        http.BaseAddress = new Uri(AppleMusicClient.BaseUrl);
         return new(new AppleMusicClient(http, _fastOptions, _tokenCache));
     }
 

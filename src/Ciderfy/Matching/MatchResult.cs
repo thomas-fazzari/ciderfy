@@ -2,6 +2,12 @@ using Ciderfy.Apple;
 
 namespace Ciderfy.Matching;
 
+internal enum MatchMethod
+{
+    Isrc = 0,
+    Text = 1,
+}
+
 /// <summary>
 /// Outcome of matching a Spotify track to Apple Music
 /// </summary>
