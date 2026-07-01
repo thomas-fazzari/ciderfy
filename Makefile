@@ -7,6 +7,7 @@ COVERAGE_RESULTS ?= ./coverage
 install:
 	dotnet restore $(SOLUTION)
 	dotnet tool restore
+	git config core.hooksPath .githooks
 
 .PHONY: build
 build:
